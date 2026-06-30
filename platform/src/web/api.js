@@ -165,6 +165,13 @@ export const Api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, params: params || {} })
     }),
+  githubStatus: () => request("/api/git/github-status"),
+  gitPublish: (repo, visibility, token) =>
+    request("/api/git/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo, visibility, token })
+    }),
   resumeRun: (runId, phaseId) =>
     request("/api/runs/resume", {
       method: "POST",

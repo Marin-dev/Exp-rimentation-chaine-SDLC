@@ -11,10 +11,134 @@ import {
   FileDiff,
   GitFork,
   UserCog,
-  Loader2
+  Loader2,
+  Github,
+  ExternalLink,
+  UploadCloud,
+  X,
+  CheckCircle2
 } from "lucide-react";
 import { Api } from "../api.js";
 import { Card, EmptyState } from "../components/ui.jsx";
+
+function GitHubPublishModal({ onClose, onPublished }) {
+  const [gh, setGh] = useState({ ghAvailable: false, ghAuthed: false });
+  const [repo, setRepo] = useState("");
+  const [visibility, setVisibility] = useState("private");
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    Api.githubStatus()
+      .then((s) => {
+        setGh(s);
+        if (s.suggestedRepo) setRepo(s.suggestedRepo);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function publish() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await Api.gitPublish(repo.trim(), visibility, token.trim());
+      if (res.ok) {
+        setResult(res);
+        onPublished(res.status);
+      } else {
+        setError(res.message || "Échec.");
+        if (res.status) onPublished(res.status);
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-base-100 rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-lg font-bold m-0 flex items-center gap-2"><Github size={18} /> Publier sur GitHub</h3>
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        {result ? (
+          <div className="mt-3">
+            <div className="rounded-md border border-[#cdebd9] bg-[#EAF7EE] p-4">
+              <div className="flex items-center gap-2 text-[#168736] font-semibold mb-1">
+                <CheckCircle2 size={17} /> {result.message}
+              </div>
+              {result.url ? (
+                <a className="text-accent break-all text-[13px] inline-flex items-center gap-1.5" href={result.url} target="_blank" rel="noreferrer">
+                  <ExternalLink size={14} /> {result.url}
+                </a>
+              ) : null}
+            </div>
+            <div className="flex justify-end mt-4">
+              <button className="btn btn-primary btn-sm" onClick={onClose}>Fermer</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="text-ey-gray01 text-[13px] mt-1 mb-3">
+              Crée le dépôt sur GitHub et pousse la branche courante, puis renvoie le lien.
+            </p>
+
+            <label className="block text-[12.5px] font-semibold mb-1.5">Nom du dépôt</label>
+            <input className="input input-bordered w-full mb-3" value={repo} onChange={(e) => setRepo(e.target.value)} spellCheck={false} />
+
+            <label className="block text-[12.5px] font-semibold mb-1.5">Visibilité</label>
+            <div className="join mb-3">
+              <button className={`btn btn-sm join-item ${visibility === "private" ? "btn-active" : ""}`} onClick={() => setVisibility("private")}>Privé</button>
+              <button className={`btn btn-sm join-item ${visibility === "public" ? "btn-active" : ""}`} onClick={() => setVisibility("public")}>Public</button>
+            </div>
+
+            {gh.ghAuthed ? (
+              <div className="rounded-md bg-base-200 border border-ey-border p-3 mb-3 text-[12.5px]">
+                <b>Connecté via la CLI gh.</b> Aucun token nécessaire — la publication utilisera votre connexion GitHub existante.
+              </div>
+            ) : (
+              <>
+                <label className="block text-[12.5px] font-semibold mb-1.5">Token d'accès GitHub</label>
+                <input
+                  type="password"
+                  className="input input-bordered w-full"
+                  placeholder="ghp_…"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  spellCheck={false}
+                />
+                <p className="text-[12px] text-ey-gray01 mt-1.5">
+                  Pas de token ?{" "}
+                  <a className="text-accent inline-flex items-center gap-1" href="https://github.com/settings/tokens/new?scopes=repo&description=SDLC%20Studio" target="_blank" rel="noreferrer">
+                    <ExternalLink size={12} /> en créer un (portée « repo »)
+                  </a>. Il n'est pas stocké : il sert uniquement à ce push.
+                </p>
+              </>
+            )}
+
+            {error ? <div className="alert alert-error text-sm my-3">{error}</div> : null}
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button className="btn btn-ghost btn-sm" onClick={onClose}>Annuler</button>
+              <button
+                className="btn btn-primary btn-sm gap-1.5"
+                onClick={publish}
+                disabled={busy || !repo.trim() || (!gh.ghAuthed && !token.trim())}
+              >
+                {busy ? <Loader2 size={15} className="animate-spin" /> : <UploadCloud size={15} />} Publier
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function GitScreen() {
   const [status, setStatus] = useState(null);
@@ -26,6 +150,7 @@ export default function GitScreen() {
   const [newBranch, setNewBranch] = useState("");
   const [identity, setIdentity] = useState({ name: "", email: "" });
   const [showIdentity, setShowIdentity] = useState(false);
+  const [showPublish, setShowPublish] = useState(false);
 
   function load() {
     Api.gitStatus().then(setStatus).catch((e) => { setMessage(e.message); setOk(false); });
@@ -97,10 +222,22 @@ export default function GitScreen() {
           <h2 className="text-[22px] font-bold tracking-tight m-0">Git</h2>
           <p className="text-ey-gray01 mt-1 mb-0">Dépôt du projet — commits, branches, synchronisation.</p>
         </div>
-        <button className="btn btn-ghost btn-sm gap-1.5" onClick={load} disabled={busy}>
-          <RefreshCw size={15} /> Rafraîchir
-        </button>
+        <div className="flex gap-2">
+          <button className="btn btn-primary btn-sm gap-1.5" onClick={() => setShowPublish(true)}>
+            <Github size={15} /> Publier sur GitHub
+          </button>
+          <button className="btn btn-ghost btn-sm gap-1.5" onClick={load} disabled={busy}>
+            <RefreshCw size={15} /> Rafraîchir
+          </button>
+        </div>
       </div>
+
+      {showPublish ? (
+        <GitHubPublishModal
+          onClose={() => setShowPublish(false)}
+          onPublished={(st) => st && setStatus(st)}
+        />
+      ) : null}
 
       {/* Branch + sync state */}
       <Card className="p-4 mt-5 flex flex-wrap items-center gap-4">

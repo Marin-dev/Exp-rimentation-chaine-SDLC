@@ -15,6 +15,7 @@ import { addInput, setInputStatus, removeInput, pendingInputsForPhase, markPhase
 import { startApp, stopApp, appStatus } from "../services/app-runner.js";
 import { getSpend } from "../services/spend-store.js";
 import { gitStatus, gitAction } from "../services/git-service.js";
+import { githubStatus, publish as githubPublish } from "../services/github-publish.js";
 import { PHASE_BY_ID, PRODUCERS, REVIEWERS, PHASE_PARALLEL } from "../domain/phases.js";
 import { startPhaseGroup, getGroup } from "../services/group-runner.js";
 import { PROFILE_BY_ID } from "../domain/profiles.js";
@@ -218,6 +219,26 @@ export async function handleApi(req, res, url) {
       const config = loadConfig();
       const root = createWorkspacePaths(config.workspaceRoot).workspaceRoot;
       sendJson(res, 200, await gitStatus(root));
+      return true;
+    }
+    if (pathname === "/api/git/github-status" && req.method === "GET") {
+      const config = loadConfig();
+      const root = createWorkspacePaths(config.workspaceRoot).workspaceRoot;
+      const st = await githubStatus();
+      sendJson(res, 200, { ok: true, ...st, suggestedRepo: path.basename(root) });
+      return true;
+    }
+    if (pathname === "/api/git/publish" && req.method === "POST") {
+      const body = await readBody(req);
+      const config = loadConfig();
+      const root = createWorkspacePaths(config.workspaceRoot).workspaceRoot;
+      const result = await githubPublish(root, {
+        repo: body.repo,
+        visibility: body.visibility,
+        token: body.token
+      });
+      const status = await gitStatus(root);
+      sendJson(res, result.ok ? 200 : 400, { ...result, status });
       return true;
     }
     if (pathname === "/api/git/action" && req.method === "POST") {
