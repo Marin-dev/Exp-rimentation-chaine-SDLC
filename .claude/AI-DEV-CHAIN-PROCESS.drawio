@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mxfile host="app.diagrams.net" modified="2026-06-25T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="ai-dev-chain-process" name="AI Dev Chain Process">
+    <mxGraphModel dx="2200" dy="1400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="AI Dev Chain - Process SDLC Multi-Agents" style="text;html=1;strokeColor=none;fillColor=none;fontSize=28;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="560" y="20" width="1080" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="Legend: blue = agent | green = quality gate | red = security/review | purple = judge | gray = deliverables/context" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="600" y="75" width="1000" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="lane0" value="Context &amp; Governance" style="swimlane;html=1;startSize=28;horizontal=0;fillColor=#f5f5f5;strokeColor=#b0b0b0;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="30" y="130" width="2100" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="lane1" value="Discovery: Vision, UX, UI, Domain" style="swimlane;html=1;startSize=28;horizontal=0;fillColor=#eef7ff;strokeColor=#9cc4e4;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="30" y="300" width="2100" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="lane2" value="Architecture &amp; Security" style="swimlane;html=1;startSize=28;horizontal=0;fillColor=#fff7e6;strokeColor=#d6b16a;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="30" y="550" width="2100" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="lane3" value="Backlog &amp; Delivery" style="swimlane;html=1;startSize=28;horizontal=0;fillColor=#f1fff0;strokeColor=#8fc58b;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="30" y="760" width="2100" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="lane4" value="Verification, Release &amp; Feedback" style="swimlane;html=1;startSize=28;horizontal=0;fillColor=#f8f0ff;strokeColor=#b99ad6;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="30" y="990" width="2100" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="lane5" value="Cross-Cutting Agent Safety" style="swimlane;html=1;startSize=28;horizontal=0;fillColor=#fff0f0;strokeColor=#d88a8a;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="30" y="1240" width="2100" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="project_context" value="Project Profile&#xA;.claude/project/PROJECT.md&#xA;+ project context files" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="170" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="rules" value="Core Rules&#xA;agent-contracts&#xA;quality-gates&#xA;security&#xA;judge-rubrics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="370" y="160" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="traceability" value="Governance Evidence&#xA;/livrables/_governance&#xA;ADRs, gates, traceability matrix" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="620" y="170" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="deliverables" value="Delivery Evidence&#xA;/livrables/01..11&#xA;Vision, UX, UI, Domain, Tech, Security, Tests, Release" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="920" y="170" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="g0" value="G0&amp;#xa;Project Context Ready&amp;#xa;validated by bootstrapper + orchestrator" style="rhombus;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="165" width="150" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sponsor" value="@sponsor&#xA;Vision, KPIs, MVP scope" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="350" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="g1" value="G1&amp;#xa;Vision Ready&amp;#xa;validated by @discovery-reviewer" style="rhombus;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="370" y="345" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ux" value="@ux&#xA;Personas, journeys, wireframes&#xA;field vocabulary" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="590" y="330" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="domain" value="@architecte-metier&#xA;Ubiquitous language&#xA;Bounded Contexts&#xA;Domain model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="590" y="430" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ui" value="@ui-designer&#xA;Claude Design if available&#xA;screen specs, components, states&#xA;developer handoff" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="360" width="250" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="g2" value="G2&amp;#xa;Domain, UX And UI Ready&amp;#xa;validated by @discovery-reviewer" style="rhombus;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="360" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ux_domain_loop" value="Bidirectional convergence&#xA;UX field evidence refines domain model&#xA;domain rules/vocabulary guide UX and UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1480" y="355" width="300" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="tech_arch" value="@architecte-technique&#xA;Application architecture&#xA;Integrations, NFRs, ADRs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="605" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sec_arch" value="@security-architect&#xA;Data classification&#xA;Threat model&#xA;Security requirements" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="605" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="arch_review" value="@architecture-reviewer&amp;#xa;G3 technical architecture challenge&amp;#xa;complexity, boundaries, NFRs, security alignment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="690" y="605" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="g3" value="G3&#xA;Architecture And Security Ready" style="rhombus;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="600" width="190" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="po" value="@po&#xA;Epics, Features, User Stories&#xA;MVP definition, traceability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="825" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="spec_review" value="@spec-reviewer&#xA;Definition of Ready&#xA;scope, clarity, testability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="400" y="825" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="g4" value="G4&#xA;Story Ready" style="rhombus;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="700" y="820" width="140" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="dev" value="@developpeur&#xA;One User Story&#xA;vertical slice + tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="825" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="code_review" value="@code-quality-reviewer&#xA;quality, patterns, tests&#xA;scope control" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="825" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="g5" value="G5&#xA;Implementation Done" style="rhombus;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1480" y="820" width="160" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="qa" value="@qa&#xA;Test strategy&#xA;L1/L2/L3 execution evidence" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1050" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="appsec" value="@appsec-reviewer&#xA;Auth, validation, secrets&#xA;logs, sensitive data, abuse cases" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="390" y="1050" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="test_review" value="@test-reviewer&#xA;Coverage and test-level review&#xA;execution evidence" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="700" y="1050" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="g6" value="G6&#xA;Verification Done" style="rhombus;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="1045" width="160" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="devops" value="@devops&#xA;CI/CD, environments&#xA;monitoring, rollback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="1050" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="release_judge" value="@release-judge&#xA;LLM-as-a-Judge rubric&#xA;release decision" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1510" y="1050" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="g7" value="G7&#xA;Release Decision" style="rhombus;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1810" y="1045" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="end_user" value="@end-user&#xA;Field feedback&#xA;usability, vocabulary, value" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1790" y="1140" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="agent_guard" value="@agent-security-guard&#xA;Prompt injection, tool scope, excessive agency, data leakage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1270" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="hardening" value="Agent architecture hardening&#xA;permissions, MCP, hooks, reviewer/judge behavior" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="520" y="1270" width="330" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="judge_note" value="LLM-as-a-Judge controls&#xA;explicit rubric, evidence reviewed, scores, PASS / FAIL / PASS_WITH_RISK" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="1270" width="380" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="feedback_note" value="Feedback loop&#xA;Release learning creates backlog refinements through @po" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="1270" width="330" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e_project_rules" style="endArrow=block;html=1;rounded=0;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1" source="project_context" target="g0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_rules_g0" style="endArrow=block;html=1;rounded=0;strokeWidth=2;strokeColor=#666666;" edge="1" parent="1" source="rules" target="g0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g0_sponsor" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g0" target="sponsor">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1375" y="285" />
+              <mxPoint x="210" y="285" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_sponsor_g1" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="sponsor" target="discovery_review_1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g1_ux" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g1" target="ux">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g1_domain" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g1" target="domain">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ux_domain" value="field vocabulary / journeys" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#d6b656;" edge="1" parent="1" source="ux" target="domain">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_domain_ux" value="rules / states / vocabulary" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#d6b656;" edge="1" parent="1" source="domain" target="ux">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ux_ui" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="ux" target="ui">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_domain_ui" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="domain" target="ui">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ui_g2" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="ui" target="discovery_review_2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_domain_g2" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="domain" target="discovery_review_2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g2_loop_note" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#d6b656;" edge="1" parent="1" source="g2" target="ux_domain_loop">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g2_tech" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g2" target="tech_arch">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1340" y="535" />
+              <mxPoint x="225" y="535" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_g2_sec" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g2" target="sec_arch">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1340" y="535" />
+              <mxPoint x="505" y="535" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_tech_arch_review" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="tech_arch" target="arch_review">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sec_arch_review" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="sec_arch" target="arch_review">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_arch_review_g3" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="arch_review" target="g3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g3_po" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g3" target="po">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1125" y="750" />
+              <mxPoint x="225" y="750" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_po_spec" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="po" target="spec_review">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_spec_g4" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="spec_review" target="g4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g4_dev" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g4" target="dev">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_dev_code" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="dev" target="code_review">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_code_g5" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="code_review" target="g5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g5_qa" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g5" target="qa">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1560" y="985" />
+              <mxPoint x="225" y="985" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_g5_appsec" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g5" target="appsec">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1560" y="985" />
+              <mxPoint x="515" y="985" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_qa_testreview" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="qa" target="test_review">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_test_g6" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="test_review" target="g6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_appsec_g6" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="appsec" target="g6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g6_devops" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g6" target="devops">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_devops_release" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="devops" target="release_judge">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_release_g7" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="release_judge" target="g7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g7_enduser" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="g7" target="end_user">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_enduser_po" value="feedback creates backlog refinements" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#9673a6;" edge="1" parent="1" source="end_user" target="po">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2025" y="1180" />
+              <mxPoint x="2025" y="935" />
+              <mxPoint x="225" y="935" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_agent_guard_hardening" style="endArrow=block;html=1;rounded=0;strokeWidth=2;strokeColor=#b85450;" edge="1" parent="1" source="agent_guard" target="hardening">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_hardening_rules" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#b85450;" edge="1" parent="1" source="hardening" target="rules">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="685" y="1360" />
+              <mxPoint x="475" y="1360" />
+              <mxPoint x="475" y="260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_gates_traceability" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#666666;" edge="1" parent="1" source="g7" target="traceability">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1885" y="250" />
+              <mxPoint x="750" y="250" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_deliverables_trace" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#666666;" edge="1" parent="1" source="deliverables" target="traceability">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="discovery_review_1" value="@discovery-reviewer&amp;#xa;G1 vision review&amp;#xa;business clarity, KPIs, MVP focus" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="335" y="455" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="discovery_review_2" value="@discovery-reviewer&amp;#xa;G2 discovery convergence review&amp;#xa;vision + UX + UI + domain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="470" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e_discovery1_g1" style="endArrow=block;html=1;rounded=0;strokeWidth=2;strokeColor=#b85450;" edge="1" parent="1" source="discovery_review_1" target="g1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_discovery2_g2" style="endArrow=block;html=1;rounded=0;strokeWidth=2;strokeColor=#b85450;" edge="1" parent="1" source="discovery_review_2" target="g2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_g1_discovery2_context" style="endArrow=block;html=1;rounded=0;dashed=1;strokeColor=#b85450;" edge="1" parent="1" source="g1" target="discovery_review_2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="intake_docs" value="Dossier docs projet&amp;#xa;brief, métier, users, process, data, SI, contraintes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eeeeee;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="165" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="project_bootstrapper" value="@project-bootstrapper&amp;#xa;inventory + synthesis&amp;#xa;PROJECT.md + context files&amp;#xa;/livrables skeleton + G0 report" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="160" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e_intake_bootstrapper" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="intake_docs" target="project_bootstrapper">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_bootstrapper_g0" style="endArrow=block;html=1;rounded=0;strokeWidth=2;" edge="1" parent="1" source="project_bootstrapper" target="g0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

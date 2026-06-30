@@ -1,0 +1,599 @@
+{
+  "decisions": [
+    {
+      "id": "DEC-0001",
+      "type": "decision",
+      "runId": "run-1782816567788-1",
+      "ref": "d1",
+      "title": "Profil projet a utiliser",
+      "summary": "Un profil projet 'DocuPost' existe deja et couvre exactement ce domaine (suivi de tournees de livraison). Faut-il reutiliser ce profil existant ou creer un nouveau profil projet dedie a ce nouveau besoin ? Ce choix conditionne ou sont ranges tout le contexte et les livrables.",
+      "context": "Un profil projet 'DocuPost' existe deja et couvre exactement ce domaine (suivi de tournees de livraison). Faut-il reutiliser ce profil existant ou creer un nouveau profil projet dedie a ce nouveau besoin ? Ce choix conditionne ou sont ranges tout le contexte et les livrables.",
+      "raisedBy": "@project-bootstrapper",
+      "targetProfile": "orchestrateur",
+      "phaseId": "G0",
+      "severity": "high",
+      "options": [
+        {
+          "id": "opt-1",
+          "label": "Reutiliser le profil DocuPost existant",
+          "detail": "Plus rapide, pas de duplication ; on enrichit le contexte deja en place."
+        },
+        {
+          "id": "opt-2",
+          "label": "Creer un nouveau profil projet dedie",
+          "detail": "Repart d'une base propre si ce besoin est un projet distinct ; demande de renommer et de reinitialiser le contexte."
+        }
+      ],
+      "evidence": [],
+      "status": "answered",
+      "createdAt": "2026-06-30T10:52:13.406Z",
+      "answer": {
+        "optionId": null,
+        "choiceLabel": "Délégué à l'IA (au mieux)",
+        "note": "",
+        "documents": [],
+        "delegated": true,
+        "decidedBy": "sponsor",
+        "decidedAt": "2026-06-30T11:17:30.444Z"
+      }
+    },
+    {
+      "id": "Q-0002",
+      "type": "question",
+      "runId": "run-1782816567788-1",
+      "ref": "q1",
+      "title": "Indicateurs de succes (KPIs)",
+      "summary": "Aucun objectif chiffre n'est fourni. Comment saura-t-on que l'outil est un succes ? Par exemple : reduction du taux d'erreurs de livraison, gain de temps par tournee, taux d'adoption par les livreurs, delai de detection des incidents. Ces cibles cadrent la valeur et seront verifiees a l'etape Vision (G1).",
+      "context": "Aucun objectif chiffre n'est fourni. Comment saura-t-on que l'outil est un succes ? Par exemple : reduction du taux d'erreurs de livraison, gain de temps par tournee, taux d'adoption par les livreurs, delai de detection des incidents. Ces cibles cadrent la valeur et seront verifiees a l'etape Vision (G1).",
+      "raisedBy": "@project-bootstrapper",
+      "targetProfile": "sponsor",
+      "phaseId": "G0",
+      "severity": "high",
+      "options": [],
+      "evidence": [],
+      "status": "answered",
+      "createdAt": "2026-06-30T10:52:13.406Z",
+      "answer": {
+        "optionId": null,
+        "choiceLabel": "Délégué à l'IA (au mieux)",
+        "note": "",
+        "documents": [],
+        "delegated": true,
+        "decidedBy": "sponsor",
+        "decidedAt": "2026-06-30T11:17:30.441Z"
+      }
+    },
+    {
+      "id": "Q-0003",
+      "type": "question",
+      "runId": "run-1782816567788-1",
+      "ref": "q2",
+      "title": "Volumetrie de lancement",
+      "summary": "Le nombre de livreurs au lancement n'est pas connu. Combien de livreurs, de tournees par jour et d'arrets par tournee sont attendus au demarrage, puis a 12 mois ? Cela dimensionne le MVP et les choix techniques.",
+      "context": "Le nombre de livreurs au lancement n'est pas connu. Combien de livreurs, de tournees par jour et d'arrets par tournee sont attendus au demarrage, puis a 12 mois ? Cela dimensionne le MVP et les choix techniques.",
+      "raisedBy": "@project-bootstrapper",
+      "targetProfile": "sponsor",
+      "phaseId": "G0",
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "answered",
+      "createdAt": "2026-06-30T10:52:13.406Z",
+      "answer": {
+        "optionId": null,
+        "choiceLabel": "Délégué à l'IA (au mieux)",
+        "note": "",
+        "documents": [],
+        "delegated": true,
+        "decidedBy": "sponsor",
+        "decidedAt": "2026-06-30T11:17:30.436Z"
+      }
+    },
+    {
+      "id": "DEC-0004",
+      "type": "decision",
+      "runId": "run-1782816567788-1",
+      "ref": "d2",
+      "title": "Hebergement / cloud",
+      "summary": "La question de l'hebergement et du cloud n'est pas tranchee par le client. Y a-t-il une preference ou une contrainte (cloud public, fournisseur impose, hebergement souverain/UE, on-premise) ? Ce choix impacte l'architecture, la securite et les couts.",
+      "context": "La question de l'hebergement et du cloud n'est pas tranchee par le client. Y a-t-il une preference ou une contrainte (cloud public, fournisseur impose, hebergement souverain/UE, on-premise) ? Ce choix impacte l'architecture, la securite et les couts.",
+      "raisedBy": "@project-bootstrapper",
+      "targetProfile": "architecte-technique",
+      "phaseId": "G0",
+      "severity": "normal",
+      "options": [
+        {
+          "id": "opt-1",
+          "label": "Cloud public au choix de l'equipe",
+          "detail": "Liberte d'architecture ; a confirmer pour la conformite des donnees personnelles."
+        },
+        {
+          "id": "opt-2",
+          "label": "Fournisseur cloud impose",
+          "detail": "Preciser lequel ; contraint les services disponibles."
+        },
+        {
+          "id": "opt-3",
+          "label": "Hebergement souverain / UE requis",
+          "detail": "Contrainte forte liee aux donnees personnelles (RGPD)."
+        },
+        {
+          "id": "opt-4",
+          "label": "Non tranche pour le MVP",
+          "detail": "On documente le choix comme decision a prendre avant la mise en production."
+        }
+      ],
+      "evidence": [],
+      "status": "answered",
+      "createdAt": "2026-06-30T10:52:13.406Z",
+      "answer": {
+        "optionId": "opt-2",
+        "choiceLabel": "Fournisseur cloud impose",
+        "note": "Azure",
+        "documents": [],
+        "decidedBy": "sponsor",
+        "decidedAt": "2026-06-30T11:09:56.100Z"
+      }
+    },
+    {
+      "id": "Q-0005",
+      "type": "question",
+      "runId": "run-1782816567788-1",
+      "ref": "q3",
+      "title": "Role administrateur",
+      "summary": "Les profils livreur et superviseur sont decrits, mais le role d'administrateur est explicitement non defini. Existe-t-il un administrateur (gestion des comptes, des depots, des parametres) ? Si oui, que doit-il pouvoir faire, et fait-il partie du MVP ou d'une phase ulterieure ?",
+      "context": "Les profils livreur et superviseur sont decrits, mais le role d'administrateur est explicitement non defini. Existe-t-il un administrateur (gestion des comptes, des depots, des parametres) ? Si oui, que doit-il pouvoir faire, et fait-il partie du MVP ou d'une phase ulterieure ?",
+      "raisedBy": "@project-bootstrapper",
+      "targetProfile": "po",
+      "phaseId": "G0",
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "answered",
+      "createdAt": "2026-06-30T10:52:13.406Z",
+      "answer": {
+        "optionId": null,
+        "choiceLabel": "Délégué à l'IA (au mieux)",
+        "note": "",
+        "documents": [],
+        "delegated": true,
+        "decidedBy": "sponsor",
+        "decidedAt": "2026-06-30T11:17:30.431Z"
+      }
+    },
+    {
+      "id": "Q-0006",
+      "type": "question",
+      "runId": "run-1782816567788-1",
+      "ref": "q4",
+      "title": "Nature de la preuve de livraison",
+      "summary": "Une 'preuve de livraison' est demandee mais sa forme n'est pas precisee. Qu'est-ce qui fait foi : signature du destinataire, photo du colis depose, code/OTP, simple statut 'livre', ou plusieurs au choix ? Cela definit une notion centrale du domaine et impacte l'ecran livreur et les exigences de securite/conservation.",
+      "context": "Une 'preuve de livraison' est demandee mais sa forme n'est pas precisee. Qu'est-ce qui fait foi : signature du destinataire, photo du colis depose, code/OTP, simple statut 'livre', ou plusieurs au choix ? Cela definit une notion centrale du domaine et impacte l'ecran livreur et les exigences de securite/conservation.",
+      "raisedBy": "@project-bootstrapper",
+      "targetProfile": "architecte-metier",
+      "phaseId": "G0",
+      "severity": "high",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T10:52:13.406Z",
+      "answer": null,
+      "priorAnswer": {
+        "optionId": null,
+        "choiceLabel": "Délégué à l'IA (au mieux)",
+        "note": "",
+        "documents": [],
+        "delegated": true,
+        "decidedBy": "sponsor",
+        "decidedAt": "2026-06-30T11:17:30.427Z"
+      }
+    },
+    {
+      "id": "DEC-0007",
+      "type": "decision",
+      "runId": "run-1782816567788-1",
+      "ref": "q5",
+      "title": "Niveau attendu du mode hors-ligne",
+      "summary": "Les livreurs sont parfois sans reseau. Quel niveau de fonctionnement hors-ligne est attendu ? Ce choix a un impact technique majeur sur le cout et la complexite du MVP.",
+      "context": "Les livreurs sont parfois sans reseau. Quel niveau de fonctionnement hors-ligne est attendu ? Ce choix a un impact technique majeur sur le cout et la complexite du MVP.",
+      "raisedBy": "@project-bootstrapper",
+      "targetProfile": "architecte-technique",
+      "phaseId": "G0",
+      "severity": "high",
+      "options": [
+        {
+          "id": "opt-1",
+          "label": "Consultation hors-ligne seulement",
+          "detail": "Le livreur peut voir sa tournee sans reseau, mais doit etre connecte pour signaler incidents et preuves. Plus simple."
+        },
+        {
+          "id": "opt-2",
+          "label": "Saisie complete hors-ligne + synchronisation",
+          "detail": "Le livreur peut tout faire sans reseau ; les donnees se synchronisent au retour du reseau. Plus puissant mais plus complexe (gestion des conflits)."
+        },
+        {
+          "id": "opt-3",
+          "label": "Connexion permanente requise",
+          "detail": "Pas de hors-ligne ; necessite une couverture reseau fiable sur le terrain. Le plus simple mais risque sur le terrain."
+        }
+      ],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T10:52:13.406Z",
+      "answer": null,
+      "priorAnswer": {
+        "optionId": null,
+        "choiceLabel": "Délégué à l'IA (au mieux)",
+        "note": "",
+        "documents": [],
+        "delegated": true,
+        "decidedBy": "sponsor",
+        "decidedAt": "2026-06-30T11:17:30.418Z"
+      }
+    },
+    {
+      "id": "Q-0008",
+      "type": "question",
+      "runId": "run-1782816567788-1",
+      "ref": "q6",
+      "title": "Origine des tournees",
+      "summary": "D'ou viennent les tournees et les arrets ? Sont-ils saisis manuellement dans l'outil par le superviseur, ou importes depuis un systeme amont existant (logiciel de gestion, fichier, WMS/ERP, optimisation de tournee) ? Cela determine s'il faut prevoir une integration et la portee du MVP.",
+      "context": "D'ou viennent les tournees et les arrets ? Sont-ils saisis manuellement dans l'outil par le superviseur, ou importes depuis un systeme amont existant (logiciel de gestion, fichier, WMS/ERP, optimisation de tournee) ? Cela determine s'il faut prevoir une integration et la portee du MVP.",
+      "raisedBy": "@project-bootstrapper",
+      "targetProfile": "architecte-metier",
+      "phaseId": "G0",
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "answered",
+      "createdAt": "2026-06-30T10:52:13.406Z",
+      "answer": {
+        "optionId": null,
+        "choiceLabel": "Délégué à l'IA (au mieux)",
+        "note": "",
+        "documents": [],
+        "delegated": true,
+        "decidedBy": "sponsor",
+        "decidedAt": "2026-06-30T11:17:30.414Z"
+      }
+    },
+    {
+      "id": "Q-0009",
+      "type": "question",
+      "runId": "run-1782816567788-1",
+      "ref": "q7",
+      "title": "Geolocalisation et donnees personnelles",
+      "summary": "Le suivi 'temps reel' et la preuve de livraison peuvent impliquer des donnees personnelles (adresses et noms des destinataires, position du livreur, signature/photo). Faut-il geolocaliser le livreur ? Existe-t-il des exigences de conformite (RGPD, duree de conservation, consentement) a respecter ? Reponse necessaire pour la classification des donnees et le threat model.",
+      "context": "Le suivi 'temps reel' et la preuve de livraison peuvent impliquer des donnees personnelles (adresses et noms des destinataires, position du livreur, signature/photo). Faut-il geolocaliser le livreur ? Existe-t-il des exigences de conformite (RGPD, duree de conservation, consentement) a respecter ? Reponse necessaire pour la classification des donnees et le threat model.",
+      "raisedBy": "@project-bootstrapper",
+      "targetProfile": "securite",
+      "phaseId": "G0",
+      "severity": "high",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T10:52:13.406Z",
+      "answer": null,
+      "priorAnswer": {
+        "optionId": null,
+        "choiceLabel": "Délégué à l'IA (au mieux)",
+        "note": "",
+        "documents": [],
+        "delegated": true,
+        "decidedBy": "sponsor",
+        "decidedAt": "2026-06-30T11:17:30.407Z"
+      }
+    },
+    {
+      "id": "DEC-0010",
+      "type": "decision",
+      "runId": "run-1782822090541-1",
+      "ref": "d1",
+      "title": "Valider ou ajuster les cibles chiffrées des KPIs (non bloquant)",
+      "summary": "Faute de chiffres dans le dossier de départ, j'ai proposé des cibles : adoption des livreurs >= 80% à 3 mois, taux de preuve de livraison >= 95%, visibilité temps réel < 2 min, baisse des erreurs/incidents -50%, baisse du temps de préparation des tournées -30%. Vous pouvez les garder telles quelles, les ajuster, ou attendre d'avoir mesuré le fonctionnement papier actuel avant de figer des chiffres. Ce choix n'empêche pas de continuer le projet.",
+      "context": "Faute de chiffres dans le dossier de départ, j'ai proposé des cibles : adoption des livreurs >= 80% à 3 mois, taux de preuve de livraison >= 95%, visibilité temps réel < 2 min, baisse des erreurs/incidents -50%, baisse du temps de préparation des tournées -30%. Vous pouvez les garder telles quelles, les ajuster, ou attendre d'avoir mesuré le fonctionnement papier actuel avant de figer des chiffres. Ce choix n'empêche pas de continuer le projet.",
+      "raisedBy": "@sponsor",
+      "targetProfile": "sponsor",
+      "phaseId": "G1",
+      "severity": "normal",
+      "options": [
+        {
+          "id": "opt-1",
+          "label": "Garder ces cibles comme hypothèses de travail",
+          "detail": "On avance avec ces chiffres ; ils seront réajustés à la première revue, une fois le fonctionnement papier mesuré."
+        },
+        {
+          "id": "opt-2",
+          "label": "Ajuster certaines cibles maintenant",
+          "detail": "Vous indiquez les valeurs voulues ; je mets à jour kpis.md et la vision en conséquence."
+        },
+        {
+          "id": "opt-3",
+          "label": "Reporter : fixer les cibles après mesure du terrain",
+          "detail": "On garde les KPIs et leur méthode de mesure, mais sans cible figée tant que la baseline papier n'est pas relevée en début de pilote."
+        }
+      ],
+      "evidence": [],
+      "status": "answered",
+      "createdAt": "2026-06-30T12:27:01.805Z",
+      "answer": {
+        "optionId": "opt-1",
+        "choiceLabel": "Garder ces cibles comme hypothèses de travail",
+        "note": "",
+        "documents": [],
+        "delegated": false,
+        "decidedBy": "orchestrateur",
+        "decidedAt": "2026-06-30T12:37:01.877Z"
+      }
+    },
+    {
+      "id": "DEC-0011",
+      "type": "decision",
+      "runId": "run-1782826195366-1",
+      "ref": "id-d1",
+      "title": "Identifiant du livreur : quel format face à la confidentialité ?",
+      "summary": "Le besoin demande que le livreur ait un identifiant au format 'NOM_PRENOM_ADRESSE'. Problème : un identifiant se retrouve partout (écrans, liens, journaux techniques, exports). Y mettre le nom et l'adresse d'une personne va à l'encontre des règles de protection des données que le projet s'est lui-même fixées, et un tel identifiant 'casse' dès qu'un livreur change de nom (mariage) ou déménage. Il faut donc décider de l'approche avant d'avancer.",
+      "context": "Le besoin demande que le livreur ait un identifiant au format 'NOM_PRENOM_ADRESSE'. Problème : un identifiant se retrouve partout (écrans, liens, journaux techniques, exports). Y mettre le nom et l'adresse d'une personne va à l'encontre des règles de protection des données que le projet s'est lui-même fixées, et un tel identifiant 'casse' dès qu'un livreur change de nom (mariage) ou déménage. Il faut donc décider de l'approche avant d'avancer.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "sponsor",
+      "phaseId": null,
+      "severity": "high",
+      "options": [
+        {
+          "id": "opt-1",
+          "label": "A — Identifiant interne stable + libellé lisible séparé (recommandé)",
+          "detail": "L'identifiant technique est neutre et stable (il ne contient pas le nom ni l'adresse), et on affiche à côté un libellé lisible (nom/prénom). Respecte la confidentialité, ne casse pas en cas de changement, sépare clairement 'identifier' et 'afficher'."
+        },
+        {
+          "id": "opt-2",
+          "label": "B — Adopter littéralement NOM_PRENOM_ADRESSE",
+          "detail": "On utilise exactement le format demandé comme identifiant. Implique d'accepter explicitement les risques : exposition de données personnelles, instabilité (changement de nom/adresse), gestion des homonymes. Nécessite une validation sécurité/RGPD et un propriétaire du risque."
+        },
+        {
+          "id": "opt-3",
+          "label": "C — Compromis : identifiant interne stable + code lisible dérivé du nom, SANS l'adresse",
+          "detail": "On garde un identifiant interne stable, et on génère un code lisible à partir du nom/prénom (+ un numéro pour distinguer les homonymes), mais on retire l'adresse. Réduit fortement l'exposition de données personnelles tout en gardant de la lisibilité."
+        }
+      ],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.525Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0012",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "id-q2",
+      "title": "À quoi sert cet identifiant, et de quelle adresse parle-t-on ?",
+      "summary": "Pour cadrer correctement, deux précisions sont nécessaires. (1) L'identifiant sert à quoi : à se connecter (login), à servir de clé interne dans le système, ou à être une référence lisible affichée aux superviseurs ? (2) 'Adresse' désigne l'adresse personnelle/domicile du livreur (donnée sensible) ou une adresse opérationnelle (dépôt/zone) ? Ces réponses orientent toute la suite.",
+      "context": "Pour cadrer correctement, deux précisions sont nécessaires. (1) L'identifiant sert à quoi : à se connecter (login), à servir de clé interne dans le système, ou à être une référence lisible affichée aux superviseurs ? (2) 'Adresse' désigne l'adresse personnelle/domicile du livreur (donnée sensible) ou une adresse opérationnelle (dépôt/zone) ? Ces réponses orientent toute la suite.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "sponsor",
+      "phaseId": null,
+      "severity": "high",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.525Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0013",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "id-q3",
+      "title": "Données personnelles dans un identifiant : acceptable ?",
+      "summary": "Mettre le nom et l'adresse d'une personne dans un identifiant qui circule dans les journaux, les liens et les exports va à l'encontre de la minimisation des données et de la posture RGPD du projet. Du point de vue sécurité, quelles sont les exigences : faut-il proscrire les données personnelles dans l'identifiant, et si le format littéral est néanmoins retenu, quels contrôles imposer (non-journalisation, restriction d'accès, pseudonymisation) ? Réponse à affiner après la décision id-d1.",
+      "context": "Mettre le nom et l'adresse d'une personne dans un identifiant qui circule dans les journaux, les liens et les exports va à l'encontre de la minimisation des données et de la posture RGPD du projet. Du point de vue sécurité, quelles sont les exigences : faut-il proscrire les données personnelles dans l'identifiant, et si le format littéral est néanmoins retenu, quels contrôles imposer (non-journalisation, restriction d'accès, pseudonymisation) ? Réponse à affiner après la décision id-d1.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "securite",
+      "phaseId": null,
+      "severity": "high",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0014",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "id-q4",
+      "title": "Comment modéliser l'identité du livreur ?",
+      "summary": "Côté domaine : faut-il que l'identité du livreur repose sur une 'clé naturelle' construite à partir du nom et de l'adresse (déconseillé car instable et non unique), ou sur un identifiant neutre et stable accompagné d'un libellé lisible ? Quelles règles d'unicité et de stabilité retenir, et quel vocabulaire métier employer (« identifiant livreur », « matricule ») ? À préciser après id-d1.",
+      "context": "Côté domaine : faut-il que l'identité du livreur repose sur une 'clé naturelle' construite à partir du nom et de l'adresse (déconseillé car instable et non unique), ou sur un identifiant neutre et stable accompagné d'un libellé lisible ? Quelles règles d'unicité et de stabilité retenir, et quel vocabulaire métier employer (« identifiant livreur », « matricule ») ? À préciser après id-d1.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "architecte-metier",
+      "phaseId": null,
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0015",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "id-q5",
+      "title": "Stratégie technique de l'identifiant livreur",
+      "summary": "Sur le plan technique, une fois le format tranché : quelle stratégie de clé (neutre/stable vs dérivée), comment normaliser les noms et adresses (accents, espaces, casse, caractères spéciaux), comment gérer les homonymes (discriminant), comment garantir la stabilité en cas de changement, et comment éviter d'exposer l'identifiant (et donc d'éventuelles données personnelles) dans les URLs, journaux et exports ? À préciser après id-d1.",
+      "context": "Sur le plan technique, une fois le format tranché : quelle stratégie de clé (neutre/stable vs dérivée), comment normaliser les noms et adresses (accents, espaces, casse, caractères spéciaux), comment gérer les homonymes (discriminant), comment garantir la stabilité en cas de changement, et comment éviter d'exposer l'identifiant (et donc d'éventuelles données personnelles) dans les URLs, journaux et exports ? À préciser après id-d1.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "architecte-technique",
+      "phaseId": null,
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0016",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "id-q6",
+      "title": "Comment le livreur est-il identifié à l'écran ?",
+      "summary": "Côté expérience : comment souhaitez-vous identifier le livreur dans les écrans (nom/prénom lisible, code, photo) ? Quelqu'un doit-il saisir ou lire cet identifiant ? A-t-il un impact sur la façon dont le livreur se connecte ? Cela oriente personas, parcours et wireframes. À préciser après id-d1.",
+      "context": "Côté expérience : comment souhaitez-vous identifier le livreur dans les écrans (nom/prénom lisible, code, photo) ? Quelqu'un doit-il saisir ou lire cet identifiant ? A-t-il un impact sur la façon dont le livreur se connecte ? Cela oriente personas, parcours et wireframes. À préciser après id-d1.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "ux",
+      "phaseId": null,
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0017",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "id-q7",
+      "title": "Où placer l'identité du livreur dans le backlog ?",
+      "summary": "Souhaitez-vous une user story dédiée à 'l'identité / le compte livreur' (création, identifiant, unicité), rattachée au thème Administration / Authentification, et avec quelle priorité par rapport au cœur du MVP (exécution terrain et suivi temps réel) ? Cela cadrera la création des stories une fois id-d1 décidée.",
+      "context": "Souhaitez-vous une user story dédiée à 'l'identité / le compte livreur' (création, identifiant, unicité), rattachée au thème Administration / Authentification, et avec quelle priorité par rapport au cœur du MVP (exécution terrain et suivi temps réel) ? Cela cadrera la création des stories une fois id-d1 décidée.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "po",
+      "phaseId": null,
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    },
+    {
+      "id": "DEC-0018",
+      "type": "decision",
+      "runId": "run-1782826195366-1",
+      "ref": "d1",
+      "title": "Quel périmètre pour le rôle administrateur ? (besoin précédent, toujours en attente)",
+      "summary": "Rappel d'une décision encore non tranchée. Aujourd'hui, le MVP prévoit un 'administrateur léger' : c'est en fait le superviseur qui, avec des droits étendus, gère les comptes et les rôles. Il n'y a pas d'espace d'administration séparé (choix volontaire au cadrage). Le besoin précédent demandait d'ajouter 'le rôle administrateur'. Il faut décider quelle ampleur on lui donne, car cela change l'effort de conception et de développement.",
+      "context": "Rappel d'une décision encore non tranchée. Aujourd'hui, le MVP prévoit un 'administrateur léger' : c'est en fait le superviseur qui, avec des droits étendus, gère les comptes et les rôles. Il n'y a pas d'espace d'administration séparé (choix volontaire au cadrage). Le besoin précédent demandait d'ajouter 'le rôle administrateur'. Il faut décider quelle ampleur on lui donne, car cela change l'effort de conception et de développement.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "sponsor",
+      "phaseId": null,
+      "severity": "high",
+      "options": [
+        {
+          "id": "opt-1",
+          "label": "A — Officialiser l'admin léger existant",
+          "detail": "On garde le fonctionnement actuel (le superviseur étendu fait l'admin), on le nomme clairement 'administrateur'. Impact faible, MVP quasi inchangé."
+        },
+        {
+          "id": "opt-2",
+          "label": "B — Vrai rôle administrateur + espace dédié",
+          "detail": "On crée un rôle distinct avec son propre espace d'administration. Cela rouvre une décision du cadrage et ajoute un effort important en UX, architecture et backlog."
+        },
+        {
+          "id": "opt-3",
+          "label": "C — Rôle distinct, sans espace dédié",
+          "detail": "On sépare clairement le rôle administrateur (droits propres, traçabilité de ses actions) mais on l'administre via des écrans superviseur étendus au MVP. Compromis entre A et B."
+        }
+      ],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0019",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "q2",
+      "title": "Quels contrôles sur les actions de l'administrateur ? (besoin précédent)",
+      "summary": "L'administrateur pourra créer, désactiver ou réinitialiser des comptes et changer des rôles : ce sont des actions sensibles. Faut-il, dès le MVP, séparer clairement ces droits des autres et garder une trace (journal) de qui fait quoi, pour la sécurité et la responsabilité ? Votre réponse précisera les exigences de sécurité une fois le périmètre (d1) tranché.",
+      "context": "L'administrateur pourra créer, désactiver ou réinitialiser des comptes et changer des rôles : ce sont des actions sensibles. Faut-il, dès le MVP, séparer clairement ces droits des autres et garder une trace (journal) de qui fait quoi, pour la sécurité et la responsabilité ? Votre réponse précisera les exigences de sécurité une fois le périmètre (d1) tranché.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "securite",
+      "phaseId": null,
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0020",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "q3",
+      "title": "Administration : parcours dédié ou intégré ? (besoin précédent)",
+      "summary": "Côté expérience utilisateur, préférez-vous un parcours et des écrans d'administration distincts (un 'espace admin'), ou que ces actions restent intégrées dans les écrans existants du superviseur ? Cela oriente personas, journeys et wireframes. Le détail dépendra de la décision d1.",
+      "context": "Côté expérience utilisateur, préférez-vous un parcours et des écrans d'administration distincts (un 'espace admin'), ou que ces actions restent intégrées dans les écrans existants du superviseur ? Cela oriente personas, journeys et wireframes. Le détail dépendra de la décision d1.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "ux",
+      "phaseId": null,
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0021",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "q4",
+      "title": "Gestion des accès : domaine à part ou module générique ? (besoin précédent)",
+      "summary": "Faut-il traiter la gestion des utilisateurs, rôles et accès comme un domaine métier à part entière (avec son propre langage et ses règles), ou comme un module 'administration' générique et standard, comme prévu initialement ? Cela influence le modèle de domaine et la cartographie des capacités.",
+      "context": "Faut-il traiter la gestion des utilisateurs, rôles et accès comme un domaine métier à part entière (avec son propre langage et ses règles), ou comme un module 'administration' générique et standard, comme prévu initialement ? Cela influence le modèle de domaine et la cartographie des capacités.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "architecte-metier",
+      "phaseId": null,
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0022",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "q5",
+      "title": "Modèle d'autorisation et accès hors-ligne pour l'admin (besoin précédent)",
+      "summary": "Sur le plan technique : confirmez-vous un modèle à trois rôles (livreur / superviseur / administrateur) avec contrôle des droits côté serveur ? Et l'administration doit-elle rester accessible uniquement en ligne (contrairement au livreur qui travaille hors-ligne) ? Réponse à affiner après la décision d1.",
+      "context": "Sur le plan technique : confirmez-vous un modèle à trois rôles (livreur / superviseur / administrateur) avec contrôle des droits côté serveur ? Et l'administration doit-elle rester accessible uniquement en ligne (contrairement au livreur qui travaille hors-ligne) ? Réponse à affiner après la décision d1.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "architecte-technique",
+      "phaseId": null,
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    },
+    {
+      "id": "Q-0023",
+      "type": "question",
+      "runId": "run-1782826195366-1",
+      "ref": "q6",
+      "title": "Comment placer l'administration dans le backlog ? (besoin précédent)",
+      "summary": "Souhaitez-vous que l'administration (comptes, rôles, données de référence) devienne un thème de backlog à part entière (un Epic dédié avec ses user stories), et avec quelle priorité par rapport au cœur du MVP (exécution terrain et suivi temps réel) ? Cela cadrera la création des stories une fois d1 décidée.",
+      "context": "Souhaitez-vous que l'administration (comptes, rôles, données de référence) devienne un thème de backlog à part entière (un Epic dédié avec ses user stories), et avec quelle priorité par rapport au cœur du MVP (exécution terrain et suivi temps réel) ? Cela cadrera la création des stories une fois d1 décidée.",
+      "raisedBy": "Nouveau besoin",
+      "targetProfile": "po",
+      "phaseId": null,
+      "severity": "normal",
+      "options": [],
+      "evidence": [],
+      "status": "pending",
+      "createdAt": "2026-06-30T13:34:57.526Z",
+      "answer": null
+    }
+  ],
+  "seq": 23,
+  "feedback": [],
+  "inputs": []
+}

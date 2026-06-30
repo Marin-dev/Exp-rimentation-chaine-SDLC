@@ -1,0 +1,23 @@
+{
+  "name": "ai-dev-chain-control-center",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local control center for the AI Dev Chain agent architecture.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "build": "vite build",
+    "start": "node server.js",
+    "check": "node server.js --check"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-native-web": "^0.19.13"
+  }
+}

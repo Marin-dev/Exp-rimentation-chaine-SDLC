@@ -1,0 +1,31 @@
+{
+  "name": "sdlc-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SDLC Studio - human-in-the-loop control platform for the AI Dev Chain agent architecture.",
+  "type": "module",
+  "scripts": {
+    "dev:web": "vite",
+    "dev:server": "node --watch server.js",
+    "build": "vite build",
+    "start": "node server.js",
+    "check": "node server.js --check"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "lucide-react": "^0.460.0",
+    "marked": "^12.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.5.2",
+    "daisyui": "^4.12.23",
+    "postcss": "^8.5.16",
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.0.7"
+  }
+}

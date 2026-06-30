@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { background: #f6f6fa; }
+
+/* EY uses sharper corners and a crisp, corporate feel. */
+.ey-beam {
+  background-image: linear-gradient(135deg, #2e2e38 0%, #1a1a24 100%);
+}
+
+/* Rendered markdown for deliverables (no typography plugin, EY palette). */
+.md { color: #2e2e38; font-size: 14px; line-height: 1.6; }
+.md > :first-child { margin-top: 0; }
+.md h1 { font-size: 22px; font-weight: 700; margin: 0 0 14px; letter-spacing: -0.01em; }
+.md h2 {
+  font-size: 17px; font-weight: 700; margin: 26px 0 10px;
+  padding-bottom: 6px; border-bottom: 2px solid #ffe600;
+}
+.md h3 { font-size: 14.5px; font-weight: 700; margin: 20px 0 8px; }
+.md p { margin: 0 0 12px; }
+.md ul, .md ol { margin: 0 0 12px; padding-left: 22px; }
+.md li { margin: 3px 0; }
+.md code {
+  background: #f6f6fa; border: 1px solid #d7d7dc;
+  padding: 1px 6px; border-radius: 4px; font-size: 12.5px;
+}
+.md pre {
+  background: #1a1a24; color: #f6f6fa; padding: 14px 16px;
+  border-radius: 6px; overflow-x: auto; margin: 0 0 14px;
+}
+.md pre code { background: transparent; border: none; padding: 0; color: inherit; }
+.md table { border-collapse: collapse; width: 100%; margin: 0 0 14px; font-size: 13px; }
+.md th, .md td { border: 1px solid #d7d7dc; padding: 7px 10px; text-align: left; }
+.md th { background: #f6f6fa; font-weight: 700; }
+.md blockquote {
+  border-left: 3px solid #ffe600; margin: 0 0 12px;
+  padding: 6px 14px; color: #747480; background: #fffdf0;
+}
+.md a { color: #155eef; text-decoration: underline; }
+.md hr { border: none; border-top: 1px solid #d7d7dc; margin: 18px 0; }
+
+/* Sidebar nav items (dark EY background) */
+.ey-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 9px 12px; border-radius: 6px;
+  color: #c4c4cd; font-size: 13.5px; text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+.ey-nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.ey-nav-item.active { background: #ffe600; color: #2e2e38; font-weight: 600; }

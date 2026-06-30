@@ -1,0 +1,19 @@
+[
+  {
+    "id": "run-1782830162875-1",
+    "label": "G1 · Revue (@discovery-reviewer)",
+    "phaseId": "G1",
+    "agent": "@discovery-reviewer",
+    "kind": "review",
+    "model": "claude-haiku-4-5-20251001",
+    "status": "done",
+    "startedAt": "2026-06-30T14:36:02.876Z",
+    "endedAt": "2026-06-30T14:40:08.429Z",
+    "durationMs": 236061,
+    "costUsd": 1.2915372500000002,
+    "inputTokens": 8721,
+    "outputTokens": 14777,
+    "cacheCreateTokens": 82489,
+    "cacheReadTokens": 722506
+  }
+]

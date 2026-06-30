@@ -1,0 +1,11 @@
+[
+  {
+    "ref": "d1",
+    "type": "decision",
+    "question": "Valider ou ajuster les cibles chiffrées des KPIs (non bloquant)",
+    "answer": "Garder ces cibles comme hypothèses de travail",
+    "note": "",
+    "documents": [],
+    "answeredBy": "orchestrateur"
+  }
+]
