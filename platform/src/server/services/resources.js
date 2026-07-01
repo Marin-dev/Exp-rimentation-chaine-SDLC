@@ -66,14 +66,19 @@ export function slugifySkill(name) {
     .slice(0, 49);
 }
 
-/** Create a new skill scaffold under .claude/skills/<slug>/SKILL.md. */
-export function createSkill(paths, { name, description }) {
+/**
+ * Create a new skill scaffold under .claude/skills/<slug>/SKILL.md.
+ * With { ifExists: "skip" }, an already-present skill is not an error (returns
+ * ok:true, skipped:true) — used when writing to the app template that may already have it.
+ */
+export function createSkill(paths, { name, description, ifExists }) {
   const slug = slugifySkill(name);
   if (!SLUG_RE.test(slug)) {
     return { ok: false, error: "Nom de skill invalide." };
   }
   const dir = path.join(paths.skillsDir, slug);
   if (fs.existsSync(dir)) {
+    if (ifExists === "skip") return { ok: true, id: slug, skipped: true };
     return { ok: false, error: `Le skill « ${slug} » existe déjà.` };
   }
   const desc = String(description || "").trim() || `Skill ${slug}.`;

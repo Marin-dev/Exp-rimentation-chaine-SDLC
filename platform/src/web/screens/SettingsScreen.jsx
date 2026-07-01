@@ -160,6 +160,7 @@ function AddSkillModal({ onClose, onCreated }) {
   const [description, setDescription] = useState("");
   const [phase, setPhase] = useState("input"); // input | searching | results
   const [suggestions, setSuggestions] = useState([]);
+  const [scope, setScope] = useState("project");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -180,8 +181,8 @@ function AddSkillModal({ onClose, onCreated }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await Api.createSkill(name.trim(), description.trim());
-      onCreated(res.state);
+      const res = await Api.createSkill(name.trim(), description.trim(), scope);
+      onCreated(res.state, res.savedToFramework);
     } catch (e) {
       setError(e.message);
       setBusy(false);
@@ -220,6 +221,7 @@ function AddSkillModal({ onClose, onCreated }) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
+            <ScopePicker scope={scope} onChange={setScope} />
             {error ? <div className="alert alert-error text-sm mb-3">{error}</div> : null}
             <div className="flex justify-end gap-2">
               <button className="btn btn-ghost btn-sm" onClick={onClose}>
@@ -277,6 +279,7 @@ function AddSkillModal({ onClose, onCreated }) {
                 </EmptyState>
               </div>
             )}
+            <ScopePicker scope={scope} onChange={setScope} />
             {error ? <div className="alert alert-error text-sm mb-3">{error}</div> : null}
             <div className="flex justify-between gap-2">
               <button className="btn btn-ghost btn-sm gap-1.5" onClick={() => setPhase("input")}>
@@ -288,6 +291,107 @@ function AddSkillModal({ onClose, onCreated }) {
             </div>
           </>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** Where to save a new agent/skill: current project only, or also the app template. */
+function ScopePicker({ scope, onChange }) {
+  return (
+    <div className="flex flex-col gap-2 mb-3">
+      <div className="text-[12px] font-semibold uppercase tracking-wide text-ey-gray01">Enregistrer dans</div>
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input type="radio" className="radio radio-sm mt-0.5" checked={scope === "project"} onChange={() => onChange("project")} />
+        <span>
+          <b className="text-[13.5px]">Ce projet uniquement</b>
+          <span className="block text-[12.5px] text-ey-gray01">Ajouté seulement au projet en cours.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input type="radio" className="radio radio-sm mt-0.5" checked={scope === "both"} onChange={() => onChange("both")} />
+        <span>
+          <b className="text-[13.5px]">Ce projet + socle de l'app</b>
+          <span className="block text-[12.5px] text-ey-gray01">
+            Ajouté au projet en cours ET enregistré dans le socle : tous les futurs nouveaux projets l'auront.
+          </span>
+        </span>
+      </label>
+    </div>
+  );
+}
+
+function AddAgentModal({ onClose, onCreated }) {
+  useEscToClose(onClose);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [tools, setTools] = useState("Read, Write, Edit, Glob, Grep");
+  const [scope, setScope] = useState("project");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function create() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await Api.createAgent(name.trim(), description.trim(), tools.trim(), scope);
+      onCreated(res.state, res.savedToFramework);
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ajouter un agent"
+        className="bg-base-100 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-bold m-0 mb-1">Ajouter un agent</h3>
+        <p className="text-ey-gray01 text-[13px] mt-0 mb-4">
+          Crée un squelette d'agent (<code>.claude/agents/&lt;nom&gt;.md</code>) à compléter ensuite.
+        </p>
+
+        <label className="block text-[12.5px] font-semibold mb-1.5">Nom de l'agent</label>
+        <input
+          className="input input-bordered w-full mb-3"
+          placeholder="ex. analyste-donnees"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+        />
+
+        <label className="block text-[12.5px] font-semibold mb-1.5">Description</label>
+        <textarea
+          className="textarea textarea-bordered w-full mb-3"
+          rows={2}
+          placeholder="À quoi sert cet agent et quand l'utiliser ?"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+
+        <label className="block text-[12.5px] font-semibold mb-1.5">Outils autorisés</label>
+        <input
+          className="input input-bordered w-full mb-1"
+          placeholder="Read, Write, Edit, Glob, Grep"
+          value={tools}
+          onChange={(e) => setTools(e.target.value)}
+        />
+        <p className="text-[11.5px] text-ey-gray02 mt-0 mb-3">Liste séparée par des virgules.</p>
+
+        <ScopePicker scope={scope} onChange={setScope} />
+
+        {error ? <div className="alert alert-error text-sm mb-3">{error}</div> : null}
+        <div className="flex justify-end gap-2">
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Annuler</button>
+          <button className="btn btn-primary btn-sm gap-1.5" onClick={create} disabled={!name.trim() || busy}>
+            <Plus size={15} /> {busy ? "Création…" : "Créer l'agent"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -306,6 +410,8 @@ export default function SettingsScreen({ state, onStateChange }) {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("agents");
   const [showSkillModal, setShowSkillModal] = useState(false);
+  const [showAgentModal, setShowAgentModal] = useState(false);
+  const [resourceMsg, setResourceMsg] = useState(null);
   const [newPath, setNewPath] = useState("");
   const [newBusy, setNewBusy] = useState(false);
   const [newMsg, setNewMsg] = useState(null);
@@ -377,8 +483,8 @@ export default function SettingsScreen({ state, onStateChange }) {
           <FolderPlus size={17} className="text-ey-gray01" /> Nouveau projet
         </h3>
         <p className="text-ey-gray01 text-[13px] mt-0 mb-3">
-          Crée un nouveau dossier de projet avec le socle réutilisable (agents, règles, skills) et
-          une arborescence /livrables vide, puis bascule le dossier de travail dessus.
+          Crée un nouveau dossier de projet à partir du <b>socle de l'app</b> (agents, règles,
+          skills, MCP) et une arborescence /livrables vide, puis bascule le dossier de travail dessus.
         </p>
         <FolderInput value={newPath} onChange={setNewPath} placeholder="C:\chemin\vers\le\nouveau-projet" />
         <button className="btn btn-primary gap-1.5 mt-3" onClick={createProject} disabled={newBusy || !newPath.trim()}>
@@ -395,12 +501,23 @@ export default function SettingsScreen({ state, onStateChange }) {
       <Card className="p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-bold m-0">Ressources du projet</h3>
+          {tab === "agents" ? (
+            <button className="btn btn-primary btn-sm gap-1.5" onClick={() => setShowAgentModal(true)}>
+              <Plus size={15} /> Ajouter un agent
+            </button>
+          ) : null}
           {tab === "skills" ? (
             <button className="btn btn-primary btn-sm gap-1.5" onClick={() => setShowSkillModal(true)}>
               <Plus size={15} /> Ajouter un skill
             </button>
           ) : null}
         </div>
+
+        {resourceMsg ? (
+          <div className="flex items-center gap-2 text-[13px] rounded-md border border-[#cdebd9] bg-[#EAF7EE] text-[#168736] px-3 py-2 mb-3">
+            <Sparkles size={15} /> {resourceMsg}
+          </div>
+        ) : null}
 
         <div role="tablist" className="tabs tabs-bordered mb-4">
           {TABS.map((t) => (
@@ -457,10 +574,31 @@ export default function SettingsScreen({ state, onStateChange }) {
       {showSkillModal ? (
         <AddSkillModal
           onClose={() => setShowSkillModal(false)}
-          onCreated={(next) => {
+          onCreated={(next, savedToFramework) => {
             onStateChange(next);
             setShowSkillModal(false);
             setTab("skills");
+            setResourceMsg(
+              savedToFramework
+                ? "Skill ajouté au projet et enregistré dans le socle de l'app (disponible pour les futurs projets)."
+                : "Skill ajouté au projet."
+            );
+          }}
+        />
+      ) : null}
+
+      {showAgentModal ? (
+        <AddAgentModal
+          onClose={() => setShowAgentModal(false)}
+          onCreated={(next, savedToFramework) => {
+            onStateChange(next);
+            setShowAgentModal(false);
+            setTab("agents");
+            setResourceMsg(
+              savedToFramework
+                ? "Agent ajouté au projet et enregistré dans le socle de l'app (disponible pour les futurs projets)."
+                : "Agent ajouté au projet."
+            );
           }}
         />
       ) : null}

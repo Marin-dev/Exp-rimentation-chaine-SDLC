@@ -23,11 +23,29 @@ export const Api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ workspaceRoot })
     }),
-  createSkill: (name, description) =>
+  newProject: (path) =>
+    request("/api/projects/new", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path })
+    }),
+  pickFolder: (initial) =>
+    request("/api/pick-folder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initial })
+    }),
+  createSkill: (name, description, scope) =>
     request("/api/skills", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description })
+      body: JSON.stringify({ name, description, scope })
+    }),
+  createAgent: (name, description, tools, scope) =>
+    request("/api/agents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description, tools, scope })
     }),
   searchSkills: (name, description) =>
     request("/api/skills/search", {
@@ -127,6 +145,7 @@ export const Api = {
       body: JSON.stringify({ docPath, comment, phaseId, by })
     }),
   getSpend: () => request("/api/spend"),
+  getActivity: () => request("/api/activity"),
   setPricing: (pricing) =>
     request("/api/config", {
       method: "POST",

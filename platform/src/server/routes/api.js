@@ -2,9 +2,10 @@ import { loadConfig, saveConfig } from "../config/store.js";
 import { buildProjectState } from "../services/project-state.js";
 import { readDeliverableContent } from "../services/deliverable-content.js";
 import { createSkill } from "../services/resources.js";
+import { createAgent } from "../services/agents.js";
 import { searchExistingSkills } from "../services/skill-discovery.js";
 import { createDecision, answerDecision, answerItemsAuto, readRunAnswers, reopenDecision } from "../services/decisions-store.js";
-import { createWorkspacePaths } from "../config/paths.js";
+import { createWorkspacePaths, frameworkRoot } from "../config/paths.js";
 import { startRun, getRun, subscribe, listRuns } from "../services/runs.js";
 import { buildG0Prompt, buildResumePrompt, buildPhasePrompt, buildReviewPrompt, buildChatPrompt, buildNewNeedPrompt, libraryPolicyText } from "../services/run-prompts.js";
 import { ingestPendingInput, ingestResolutions } from "../services/inbox-ingest.js";
@@ -98,9 +99,8 @@ export async function handleApi(req, res, url) {
 
     if (pathname === "/api/projects/new" && req.method === "POST") {
       const body = await readBody(req);
-      const config = loadConfig();
-      const sourceRoot = createWorkspacePaths(config.workspaceRoot).workspaceRoot;
-      const result = scaffoldProject(sourceRoot, body.path);
+      // New projects are seeded from the app-bundled framework template, not the current workspace.
+      const result = scaffoldProject(body.path);
       if (!result.ok) {
         sendJson(res, 400, result);
         return true;
@@ -147,16 +147,41 @@ export async function handleApi(req, res, url) {
       const body = await readBody(req);
       const config = loadConfig();
       const paths = createWorkspacePaths(config.workspaceRoot);
-      const result = createSkill(paths, {
-        name: body.name,
-        description: body.description
-      });
+      // Always add to the current project; scope "both" also persists it into the app template.
+      const result = createSkill(paths, { name: body.name, description: body.description });
       if (!result.ok) {
         sendJson(res, 400, result);
         return true;
       }
+      let savedToFramework = false;
+      if (body.scope === "both") {
+        const fwPaths = createWorkspacePaths(frameworkRoot);
+        const fwResult = createSkill(fwPaths, { name: body.name, description: body.description, ifExists: "skip" });
+        savedToFramework = fwResult.ok;
+      }
       const state = await buildProjectState(config);
-      sendJson(res, 200, { ok: true, id: result.id, state });
+      sendJson(res, 200, { ok: true, id: result.id, savedToFramework, state });
+      return true;
+    }
+
+    if (pathname === "/api/agents" && req.method === "POST") {
+      const body = await readBody(req);
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      // Always add to the current project; scope "both" also persists it into the app template.
+      const result = createAgent(paths, { name: body.name, description: body.description, tools: body.tools });
+      if (!result.ok) {
+        sendJson(res, 400, result);
+        return true;
+      }
+      let savedToFramework = false;
+      if (body.scope === "both") {
+        const fwPaths = createWorkspacePaths(frameworkRoot);
+        const fwResult = createAgent(fwPaths, { name: body.name, description: body.description, tools: body.tools, ifExists: "skip" });
+        savedToFramework = fwResult.ok;
+      }
+      const state = await buildProjectState(config);
+      sendJson(res, 200, { ok: true, id: result.id, savedToFramework, state });
       return true;
     }
 
