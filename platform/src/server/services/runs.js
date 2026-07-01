@@ -18,7 +18,10 @@ function captureUsage(run, line) {
   if (evt.usage) run.usage = evt.usage;
   if (typeof evt.duration_ms === "number") run.durationMs = evt.duration_ms;
   if (evt.modelUsage && typeof evt.modelUsage === "object") {
-    run.model = Object.keys(evt.modelUsage)[0] || run.model;
+    // The CLI reports a dated model id (e.g. claude-opus-4-8-20260101); the pricing
+    // table is keyed on the bare id, so strip the trailing -YYYYMMDD for the lookup.
+    const raw = Object.keys(evt.modelUsage)[0];
+    if (raw) run.model = raw.replace(/-\d{8}$/, "");
   }
 }
 
@@ -56,10 +59,12 @@ let counter = 0;
 function toolLabel(p) {
   const i = p.input || {};
   const short = (s) => String(s || "").replace(/\s+/g, " ").slice(0, 90);
+  // File paths are re-parsed by the activity log, so keep them intact (don't truncate).
+  const fullPath = (s) => String(s || "").replace(/\s+/g, " ");
   switch (p.name) {
-    case "Read": return `Lecture · ${short(i.file_path)}`;
-    case "Write": return `Écriture · ${short(i.file_path)}`;
-    case "Edit": return `Modification · ${short(i.file_path)}`;
+    case "Read": return `Lecture · ${fullPath(i.file_path)}`;
+    case "Write": return `Écriture · ${fullPath(i.file_path)}`;
+    case "Edit": return `Modification · ${fullPath(i.file_path)}`;
     case "Bash": return `Commande · ${short(i.command)}`;
     case "Glob": return `Recherche fichiers · ${short(i.pattern)}`;
     case "Grep": return `Recherche · ${short(i.pattern)}`;
@@ -144,6 +149,9 @@ export function subscribe(runId, res) {
   res.write(`data: ${JSON.stringify({ type: "log", chunk: run.log })}\n\n`);
   res.write(`data: ${JSON.stringify({ type: "status", status: run.status })}\n\n`);
   if (run.status !== "running") {
+    // Run already finished before this subscriber connected — still signal completion
+    // so late-arriving clients (chat, next-steps) don't hang waiting for "ingested".
+    res.write(`data: ${JSON.stringify({ type: "ingested" })}\n\n`);
     res.end();
     return;
   }
@@ -194,8 +202,20 @@ export function startRun(config, { label, phaseId, agent, prompt, cwd, kind, onD
     );
   } catch (e) {
     run.status = "error";
+    run.exitOk = false;
     run.endedAt = new Date().toISOString();
     append(`\n[Erreur de lancement] ${e.message}\n`);
+    // Finalize like a normal exit so cost is recorded and any group waiting on onDone unblocks.
+    persistSpend(cwd, run);
+    broadcast(run, { type: "status", status: run.status });
+    (async () => {
+      if (onDone) {
+        try { await onDone(run); } catch (err) { append(`\n[Ingestion] erreur: ${err.message}\n`); }
+      }
+      broadcast(run, { type: "ingested" });
+      for (const res of run.subscribers) { try { res.end(); } catch {} }
+      run.subscribers.clear();
+    })();
     return id;
   }
 

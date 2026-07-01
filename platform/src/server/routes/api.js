@@ -14,6 +14,9 @@ import { addFeedback } from "../services/feedback-store.js";
 import { addInput, setInputStatus, removeInput, pendingInputsForPhase, markPhaseInputsConsidered } from "../services/inputs-store.js";
 import { startApp, stopApp, appStatus } from "../services/app-runner.js";
 import { getSpend } from "../services/spend-store.js";
+import { buildActivity } from "../services/activity.js";
+import { scaffoldProject } from "../services/project-scaffold.js";
+import { pickFolder } from "../services/folder-picker.js";
 import { gitStatus, gitAction } from "../services/git-service.js";
 import { githubStatus, publish as githubPublish } from "../services/github-publish.js";
 import { PHASE_BY_ID, PRODUCERS, REVIEWERS, PHASE_PARALLEL } from "../domain/phases.js";
@@ -84,6 +87,27 @@ export async function handleApi(req, res, url) {
       const config = loadConfig();
       const result = readDeliverableContent(config, url.searchParams.get("path"));
       sendJson(res, result.ok ? 200 : 400, result);
+      return true;
+    }
+
+    if (pathname === "/api/pick-folder" && req.method === "POST") {
+      const body = await readBody(req);
+      sendJson(res, 200, await pickFolder(String(body.initial || "")));
+      return true;
+    }
+
+    if (pathname === "/api/projects/new" && req.method === "POST") {
+      const body = await readBody(req);
+      const config = loadConfig();
+      const sourceRoot = createWorkspacePaths(config.workspaceRoot).workspaceRoot;
+      const result = scaffoldProject(sourceRoot, body.path);
+      if (!result.ok) {
+        sendJson(res, 400, result);
+        return true;
+      }
+      saveConfig({ workspaceRoot: result.path });
+      const state = await buildProjectState(loadConfig());
+      sendJson(res, 200, { ok: true, path: result.path, state });
       return true;
     }
 
@@ -303,6 +327,12 @@ export async function handleApi(req, res, url) {
       return true;
     }
 
+    if (pathname === "/api/activity" && req.method === "GET") {
+      const config = loadConfig();
+      sendJson(res, 200, { ok: true, ...buildActivity(config) });
+      return true;
+    }
+
     if (pathname === "/api/intake/scan" && req.method === "POST") {
       const body = await readBody(req);
       sendJson(res, 200, scanIntake(String(body.path || "").trim()));
@@ -353,7 +383,8 @@ export async function handleApi(req, res, url) {
         cwd: paths.workspaceRoot,
         onDone: (run) => {
           ingestResolutions(paths);
-          markPhaseInputsConsidered(paths, phaseId);
+          // Only mark inputs consumed if the agent actually completed — a failed run never read them.
+          if (run.status === "done") markPhaseInputsConsidered(paths, phaseId);
           return ingestPendingInput(paths, { runId: run.id, phaseId, raisedBy: PHASE_AGENTS[phaseId] });
         }
       });
@@ -530,6 +561,11 @@ export async function handleApi(req, res, url) {
       const fromRunId = String(body.runId || "").trim();
       const rawPhase = String(body.phaseId || "").trim();
       const phaseId = rawPhase && rawPhase !== "new-need" ? rawPhase : null;
+      // A phaseId that isn't a known phase would crash the prompt builder (phase.id on undefined).
+      if (phaseId && !PHASE_BY_ID[phaseId]) {
+        sendJson(res, 400, { ok: false, error: "Étape inconnue pour la reprise." });
+        return true;
+      }
       const answers = readRunAnswers(paths, fromRunId);
       if (!answers.length) {
         sendJson(res, 400, { ok: false, error: "Aucune réponse à transmettre." });

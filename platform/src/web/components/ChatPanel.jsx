@@ -48,6 +48,18 @@ export default function ChatPanel({ phaseId, agentLabel, profile, profileObj, on
       .then(({ runId }) => {
         const es = new EventSource(`/api/runs/${encodeURIComponent(runId)}/stream`);
         esRef.current = es;
+        let finished = false;
+        const finalize = (notify) => {
+          if (finished) return;
+          finished = true;
+          const finalText = accRef.current.replace(/^\[Démarrage\][^\n]*\n?/, "").trim();
+          setMessages((prev) => [...prev, { role: "agent", text: finalText || "(pas de réponse)" }]);
+          setStreaming(false);
+          streamingRef.current = false;
+          setStreamText("");
+          es.close();
+          if (notify) onRunDone && onRunDone();
+        };
         es.onmessage = (e) => {
           let msg;
           try { msg = JSON.parse(e.data); } catch { return; }
@@ -55,16 +67,11 @@ export default function ChatPanel({ phaseId, agentLabel, profile, profileObj, on
             accRef.current += msg.chunk;
             setStreamText(accRef.current);
           } else if (msg.type === "ingested") {
-            const finalText = accRef.current.replace(/^\[Démarrage\][^\n]*\n?/, "").trim();
-            setMessages((prev) => [...prev, { role: "agent", text: finalText || "(pas de réponse)" }]);
-            setStreaming(false);
-            streamingRef.current = false;
-            setStreamText("");
-            es.close();
-            onRunDone && onRunDone();
+            finalize(true);
           }
         };
-        es.onerror = () => es.close();
+        // If the stream drops before "ingested" (network error, run died early), don't hang forever.
+        es.onerror = () => { if (streamingRef.current) finalize(false); else es.close(); };
       })
       .catch((err) => {
         setMessages((prev) => [...prev, { role: "agent", text: `Erreur : ${err.message}` }]);

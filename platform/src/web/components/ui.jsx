@@ -1,4 +1,14 @@
-import React from "react";
+import React, { useEffect } from "react";
+
+/** Close a modal on Escape. Pass the modal's onClose handler. */
+export function useEscToClose(onClose) {
+  useEffect(() => {
+    if (!onClose) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+}
 
 const GATE_DISPLAY = {
   PASS: { fg: "#168736", bg: "#EAF7EE", label: "Validé" },

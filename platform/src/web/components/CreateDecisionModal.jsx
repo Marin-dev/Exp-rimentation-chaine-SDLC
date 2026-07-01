@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import { Api } from "../api.js";
+import { useEscToClose } from "./ui.jsx";
 
 export default function CreateDecisionModal({ state, currentProfile, onClose, onCreated }) {
+  useEscToClose(onClose);
   const me = state.profiles.find((p) => p.id === currentProfile);
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
@@ -46,12 +48,15 @@ export default function CreateDecisionModal({ state, currentProfile, onClose, on
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Demander une décision"
         className="bg-base-100 rounded-lg shadow-xl w-full max-w-xl max-h-[88vh] overflow-y-auto p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-lg font-bold m-0">Demander une décision</h3>
-          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose}>
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose} aria-label="Fermer">
             <X size={18} />
           </button>
         </div>

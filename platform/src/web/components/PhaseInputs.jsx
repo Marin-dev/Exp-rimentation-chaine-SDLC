@@ -45,12 +45,22 @@ export default function PhaseInputs({ phase, onStateChange }) {
   }
 
   async function toggle(it) {
-    const res = await Api.setInputStatus(it.id, it.status === "considered" ? "pending" : "considered");
-    onStateChange(res.state);
+    setError(null);
+    try {
+      const res = await Api.setInputStatus(it.id, it.status === "considered" ? "pending" : "considered");
+      onStateChange(res.state);
+    } catch (e) {
+      setError(e.message);
+    }
   }
   async function remove(it) {
-    const res = await Api.removeInput(it.id);
-    onStateChange(res.state);
+    setError(null);
+    try {
+      const res = await Api.removeInput(it.id);
+      onStateChange(res.state);
+    } catch (e) {
+      setError(e.message);
+    }
   }
 
   const pendingCount = inputs.filter((i) => i.status === "pending").length;

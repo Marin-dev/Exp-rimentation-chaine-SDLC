@@ -70,8 +70,10 @@ export function startPhaseGroup(config, paths, phase, stages) {
       group.currentStage = i;
       await Promise.all(stages[i].map((task) => runTask(config, paths, group, i, phase, task)));
     }
-    markPhaseInputsConsidered(paths, phase.id);
-    group.status = "done";
+    // Only mark inputs consumed if every agent completed — if any failed, the inputs may not have been read.
+    const anyError = group.stages.some((s) => s.agents.some((a) => a.status === "error"));
+    if (!anyError) markPhaseInputsConsidered(paths, phase.id);
+    group.status = anyError ? "error" : "done";
   })().catch(() => {
     group.status = "error";
   });

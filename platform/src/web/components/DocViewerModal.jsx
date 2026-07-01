@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { X, MessageSquarePlus, Send, FileText, Sparkles } from "lucide-react";
 import { Api } from "../api.js";
 import MarkdownView from "./MarkdownView.jsx";
+import { useEscToClose } from "./ui.jsx";
 
 export default function DocViewerModal({ doc, phaseId, profile, feedback, onClose, onStateChange, onStartImpact }) {
   const [content, setContent] = useState(null);
@@ -10,8 +11,12 @@ export default function DocViewerModal({ doc, phaseId, profile, feedback, onClos
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
+  useEscToClose(onClose);
+
   useEffect(() => {
     setLoading(true);
+    setError(null);
+    setContent(null);
     Api.getDeliverable(doc.path)
       .then((r) => setContent(r.content))
       .catch((e) => setError(e.message))
@@ -37,6 +42,9 @@ export default function DocViewerModal({ doc, phaseId, profile, feedback, onClos
   return (
     <div className="fixed inset-0 z-40 bg-black/50 p-4 md:p-8" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={doc.title}
         className="bg-base-100 rounded-lg shadow-2xl w-full h-full max-w-6xl mx-auto flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -47,7 +55,7 @@ export default function DocViewerModal({ doc, phaseId, profile, feedback, onClos
             <div className="font-bold text-[15px] truncate">{doc.title}</div>
             <div className="text-[11.5px] text-ey-gray02 truncate">{doc.path}</div>
           </div>
-          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose}>
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose} aria-label="Fermer">
             <X size={18} />
           </button>
         </div>
@@ -57,10 +65,12 @@ export default function DocViewerModal({ doc, phaseId, profile, feedback, onClos
           <div className="overflow-y-auto px-8 py-6">
             {loading ? (
               <div className="text-ey-gray01">Chargement…</div>
+            ) : error ? (
+              <div className="alert alert-error text-sm">{error}</div>
             ) : content ? (
               <MarkdownView content={content} />
             ) : (
-              <div className="alert alert-error text-sm">{error}</div>
+              <div className="text-ey-gray01 text-[13px] italic">Ce document est vide.</div>
             )}
           </div>
 

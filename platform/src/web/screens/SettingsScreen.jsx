@@ -10,10 +10,13 @@ import {
   Sparkles,
   FolderOpen,
   Library,
-  X
+  X,
+  FolderPlus,
+  Rocket
 } from "lucide-react";
 import { Api } from "../api.js";
-import { Card, EmptyState } from "../components/ui.jsx";
+import { Card, EmptyState, useEscToClose } from "../components/ui.jsx";
+import FolderInput from "../components/FolderInput.jsx";
 
 function LibraryPolicyCard({ state, onStateChange }) {
   const current = (state.config && state.config.policies && state.config.policies.libraries) || { mode: "ask", allowed: [] };
@@ -152,6 +155,7 @@ function SuggestionCard({ s }) {
 }
 
 function AddSkillModal({ onClose, onCreated }) {
+  useEscToClose(onClose);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [phase, setPhase] = useState("input"); // input | searching | results
@@ -187,6 +191,9 @@ function AddSkillModal({ onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ajouter un skill"
         className="bg-base-100 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
@@ -299,6 +306,27 @@ export default function SettingsScreen({ state, onStateChange }) {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("agents");
   const [showSkillModal, setShowSkillModal] = useState(false);
+  const [newPath, setNewPath] = useState("");
+  const [newBusy, setNewBusy] = useState(false);
+  const [newMsg, setNewMsg] = useState(null);
+  const [newErr, setNewErr] = useState(null);
+
+  async function createProject() {
+    setNewBusy(true);
+    setNewMsg(null);
+    setNewErr(null);
+    try {
+      const res = await Api.newProject(newPath.trim());
+      onStateChange(res.state);
+      setNewMsg(`Projet créé : ${res.path}. Dossier de travail basculé dessus.`);
+      setNewPath("");
+      setWorkspace(res.state.config.workspaceRoot);
+    } catch (e) {
+      setNewErr(e.message);
+    } finally {
+      setNewBusy(false);
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -332,12 +360,7 @@ export default function SettingsScreen({ state, onStateChange }) {
         <p className="text-ey-gray01 text-[13px] mt-0 mb-3">
           Le dossier du projet contenant <code>.claude/</code> et <code>livrables/</code>.
         </p>
-        <input
-          className="input input-bordered w-full"
-          value={workspace}
-          onChange={(e) => setWorkspace(e.target.value)}
-          spellCheck={false}
-        />
+        <FolderInput value={workspace} onChange={setWorkspace} />
         <p className={`text-[12px] mt-1.5 ${state.config.workspaceExists ? "text-success" : "text-error"}`}>
           {state.config.workspaceExists ? "Dossier détecté" : "Ce dossier est introuvable."}
         </p>
@@ -346,6 +369,23 @@ export default function SettingsScreen({ state, onStateChange }) {
         <button className="btn btn-primary btn-sm mt-1" onClick={save} disabled={saving}>
           {saving ? "Enregistrement…" : "Enregistrer"}
         </button>
+      </Card>
+
+      {/* New project */}
+      <Card className="p-5 mb-4">
+        <h3 className="text-base font-bold mt-0 mb-1 flex items-center gap-2">
+          <FolderPlus size={17} className="text-ey-gray01" /> Nouveau projet
+        </h3>
+        <p className="text-ey-gray01 text-[13px] mt-0 mb-3">
+          Crée un nouveau dossier de projet avec le socle réutilisable (agents, règles, skills) et
+          une arborescence /livrables vide, puis bascule le dossier de travail dessus.
+        </p>
+        <FolderInput value={newPath} onChange={setNewPath} placeholder="C:\chemin\vers\le\nouveau-projet" />
+        <button className="btn btn-primary gap-1.5 mt-3" onClick={createProject} disabled={newBusy || !newPath.trim()}>
+          <Rocket size={16} /> {newBusy ? "Création…" : "Créer le projet"}
+        </button>
+        {newMsg ? <div className="text-success text-sm mt-2">{newMsg}</div> : null}
+        {newErr ? <div className="alert alert-error text-sm mt-2">{newErr}</div> : null}
       </Card>
 
       {/* Library policy */}

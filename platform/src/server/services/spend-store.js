@@ -44,7 +44,9 @@ function bucket(map, key, rec) {
 function effectiveCost(rec, pricing) {
   if (rec.costUsd && rec.costUsd > 0) return { cost: rec.costUsd, estimated: false };
   const models = (pricing && pricing.models) || {};
-  const p = models[rec.model] || models[(pricing && pricing.default) || ""] || null;
+  // Older records may carry a dated model id (e.g. claude-opus-4-8-20260101); normalize it.
+  const modelKey = (rec.model || "").replace(/-\d{8}$/, "");
+  const p = models[modelKey] || models[(pricing && pricing.default) || ""] || null;
   if (!p) return { cost: 0, estimated: false };
   const cost =
     ((rec.inputTokens || 0) * (p.input || 0) +

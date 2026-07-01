@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { X, FileText, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, Paperclip, Trash2, Loader2, Sparkles, RotateCcw } from "lucide-react";
 import { Api } from "../api.js";
-import { Avatar } from "./ui.jsx";
+import { Avatar, useEscToClose } from "./ui.jsx";
 import MarkdownView from "./MarkdownView.jsx";
 
 function fileToDataUrl(file) {
@@ -56,6 +56,8 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const fileRef = useRef(null);
+
+  useEscToClose(onClose);
 
   const me = profiles.find((p) => p.id === currentProfile);
   const hasOptions = decision.options && decision.options.length > 0;
@@ -122,6 +124,9 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={decision.title}
         className="bg-base-100 rounded-lg shadow-xl w-full max-w-2xl max-h-[88vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
@@ -146,7 +151,7 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
             </div>
             <h3 className="text-lg font-bold m-0">{decision.title}</h3>
           </div>
-          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose}>
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose} aria-label="Fermer">
             <X size={18} />
           </button>
         </div>

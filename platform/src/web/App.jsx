@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, AlertTriangle, X } from "lucide-react";
 import { Api } from "./api.js";
 import Layout from "./components/Layout.jsx";
 import DashboardScreen from "./screens/DashboardScreen.jsx";
@@ -9,6 +9,7 @@ import DecisionsScreen from "./screens/DecisionsScreen.jsx";
 import LaunchScreen from "./screens/LaunchScreen.jsx";
 import LaunchAppScreen from "./screens/LaunchAppScreen.jsx";
 import CostScreen from "./screens/CostScreen.jsx";
+import ActivityScreen from "./screens/ActivityScreen.jsx";
 import PhaseScreen from "./screens/PhaseScreen.jsx";
 import GitScreen from "./screens/GitScreen.jsx";
 import SettingsScreen from "./screens/SettingsScreen.jsx";
@@ -19,6 +20,7 @@ const TITLES = {
   dashboard: "Accueil",
   decisions: "Décisions",
   pipeline: "Avancement",
+  activity: "Activité",
   cost: "Coûts",
   launch: "Lancement",
   documents: "Documents",
@@ -30,6 +32,7 @@ const TITLES = {
 export default function App() {
   const [state, setState] = useState(null);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
   const [screen, setScreen] = useState("dashboard");
   const [profile, setProfile] = useState(
     () => localStorage.getItem("sdlc.profile") || "orchestrateur"
@@ -77,7 +80,8 @@ export default function App() {
         setScreen("launch");
       }
     } catch (e) {
-      setError(e.message);
+      // Action failure: show a dismissable toast, don't blank the whole app.
+      setNotice({ type: "error", text: e.message });
     }
   }
 
@@ -90,7 +94,8 @@ export default function App() {
       setSelectedPhaseId(phaseId);
       setScreen("phase");
     } catch (e) {
-      setError(e.message);
+      // Action failure: show a dismissable toast, don't blank the whole app.
+      setNotice({ type: "error", text: e.message });
     }
   }
 
@@ -102,7 +107,8 @@ export default function App() {
       setSelectedPhaseId(phaseId);
       setScreen("phase");
     } catch (e) {
-      setError(e.message);
+      // Action failure: show a dismissable toast, don't blank the whole app.
+      setNotice({ type: "error", text: e.message });
     }
   }
 
@@ -117,7 +123,8 @@ export default function App() {
       setActiveRun({ id: res.runId, label: "Nouveau besoin · Requalification", phaseId: "new-need" });
       setScreen("launch");
     } catch (e) {
-      setError(e.message);
+      // Action failure: show a dismissable toast, don't blank the whole app.
+      setNotice({ type: "error", text: e.message });
     }
   }
 
@@ -130,13 +137,21 @@ export default function App() {
       setSelectedPhaseId(phaseId);
       setScreen("phase");
     } catch (e) {
-      setError(e.message);
+      // Action failure: show a dismissable toast, don't blank the whole app.
+      setNotice({ type: "error", text: e.message });
     }
   }
 
   useEffect(() => {
     load();
   }, []);
+
+  // Auto-dismiss action toasts after a few seconds.
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   function changeProfile(id) {
     setProfile(id);
@@ -226,6 +241,7 @@ export default function App() {
         ) : null}
         {screen === "phase" ? (
           <PhaseScreen
+            key={selectedPhaseId}
             state={state}
             phaseId={selectedPhaseId}
             profile={profile}
@@ -256,6 +272,14 @@ export default function App() {
         ) : null}
         {screen === "app" ? <LaunchAppScreen /> : null}
         {screen === "cost" ? <CostScreen /> : null}
+        {screen === "activity" ? (
+          <ActivityScreen
+            state={state}
+            onOpenPhase={(id) => { setSelectedPhaseId(id); setScreen("phase"); }}
+            onOpenDecision={setOpenDecision}
+            onNavigate={navigate}
+          />
+        ) : null}
         {screen === "git" ? <GitScreen /> : null}
         {screen === "settings" ? (
           <SettingsScreen state={state} onStateChange={setState} />
@@ -294,6 +318,19 @@ export default function App() {
           </button>
           <button className="btn btn-ghost btn-sm text-white" onClick={() => setResume(null)}>
             Plus tard
+          </button>
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="fixed top-5 right-5 z-50 max-w-sm bg-base-100 border border-error/40 rounded-lg shadow-xl px-4 py-3 flex items-start gap-3">
+          <AlertTriangle size={18} className="text-error shrink-0 mt-0.5" />
+          <div className="text-[13px] flex-1">
+            <b>L'action a échoué.</b>
+            <div className="text-ey-gray01 text-[12.5px] mt-0.5 break-words">{notice.text}</div>
+          </div>
+          <button className="btn btn-ghost btn-xs btn-square" onClick={() => setNotice(null)} aria-label="Fermer">
+            <X size={15} />
           </button>
         </div>
       ) : null}

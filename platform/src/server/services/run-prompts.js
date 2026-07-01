@@ -203,7 +203,7 @@ Réponds directement à l'utilisateur (ton conversationnel). ${contractBlock()}`
 export function buildResumePrompt({ phaseLabel, agent }) {
   return `Tu reprends le travail de l'étape ${phaseLabel || ""} en agissant comme ${agent || "l'agent responsable"}.
 
-Des réponses humaines viennent d'être fournies dans \`.claude/control-center/answers.json\`. Lis-les, intègre-les à tes livrables, et continue l'étape :
+Des réponses humaines viennent d'être fournies dans \`livrables/_governance/agent-io/answers.json\`. Lis-les, intègre-les à tes livrables, et continue l'étape :
 - mets à jour les livrables Markdown concernés ;
 - si de nouvelles imprécisions ou décisions apparaissent, pose-les via le protocole ;
 - si l'étape est désormais complète, mets à jour le fichier de gate correspondant.

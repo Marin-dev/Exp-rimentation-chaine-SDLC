@@ -19,9 +19,10 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { Api } from "../api.js";
-import { Card, EmptyState } from "../components/ui.jsx";
+import { Card, EmptyState, useEscToClose } from "../components/ui.jsx";
 
 function GitHubPublishModal({ onClose, onPublished }) {
+  useEscToClose(onClose);
   const [gh, setGh] = useState({ ghAvailable: false, ghAuthed: false });
   const [repo, setRepo] = useState("");
   const [visibility, setVisibility] = useState("private");
@@ -60,10 +61,10 @@ function GitHubPublishModal({ onClose, onPublished }) {
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-base-100 rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="Publier sur GitHub" className="bg-base-100 rounded-lg shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-lg font-bold m-0 flex items-center gap-2"><Github size={18} /> Publier sur GitHub</h3>
-          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose}><X size={18} /></button>
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose} aria-label="Fermer"><X size={18} /></button>
         </div>
 
         {result ? (
