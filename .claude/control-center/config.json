@@ -1,9 +1,0 @@
-{
-  "claudeCommand": "claude",
-  "claudeArgs": [
-    "-p",
-    "{prompt}"
-  ],
-  "maxIntakeFiles": 500,
-  "maxFilePreviewChars": 1600
-}
