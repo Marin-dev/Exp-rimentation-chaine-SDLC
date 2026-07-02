@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 
 function run(cmd, args, cwd) {
   return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, timeout: 120000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile(cmd, args, { cwd, timeout: 120000, maxBuffer: 10 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
       resolve({
         ok: !err,
         stdout: (stdout || "").toString(),

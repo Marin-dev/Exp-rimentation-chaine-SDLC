@@ -12,7 +12,10 @@ export function runClaudePrint(config, prompt, { timeoutMs = 150000, cwd } = {})
     let child;
     try {
       // shell:true lets Windows resolve `claude.cmd`; argv is constant ("-p").
-      child = spawn(command, ["-p"], { cwd, shell: true });
+      // windowsHide avoids allocating a console/conhost per spawn, which under
+      // repeated launches exhausts the desktop heap and makes new processes fail
+      // to init (Windows STATUS_DLL_INIT_FAILED, exit code 0xC0000142).
+      child = spawn(command, ["-p"], { cwd, shell: true, windowsHide: true });
     } catch (e) {
       resolve({ ok: false, error: `Impossible de lancer Claude: ${e.message}` });
       return;

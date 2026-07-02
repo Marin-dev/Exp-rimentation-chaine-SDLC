@@ -17,7 +17,7 @@ build/
  */
 function runGit(cwd, args) {
   return new Promise((resolve) => {
-    execFile("git", args, { cwd, timeout: 60000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile("git", args, { cwd, timeout: 60000, maxBuffer: 10 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
       resolve({
         ok: !err,
         stdout: (stdout || "").toString(),

@@ -198,7 +198,10 @@ export function startRun(config, { label, phaseId, agent, prompt, cwd, kind, onD
     child = spawn(
       config.claudeCommand || "claude",
       ["-p", "--permission-mode", "acceptEdits", "--output-format", "stream-json", "--verbose"],
-      { cwd, shell: true }
+      // windowsHide avoids allocating a console/conhost per spawn, which under
+      // repeated launches exhausts the desktop heap and makes new processes fail
+      // to init (Windows STATUS_DLL_INIT_FAILED, exit code 0xC0000142).
+      { cwd, shell: true, windowsHide: true }
     );
   } catch (e) {
     run.status = "error";

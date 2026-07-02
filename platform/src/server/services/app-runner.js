@@ -36,7 +36,7 @@ export function startApp(config, name, workspaceRoot) {
 
   let child;
   try {
-    child = spawn(cfg.command, { cwd, shell: true });
+    child = spawn(cfg.command, { cwd, shell: true, windowsHide: true });
   } catch (e) {
     r.status = "error";
     append(r, `[Erreur] ${e.message}\n`);
@@ -66,7 +66,7 @@ export function stopApp(name) {
   try {
     if (process.platform === "win32") {
       // Kill the whole process tree (shell -> npm -> node).
-      spawn("taskkill", ["/PID", String(pid), "/T", "/F"], { shell: false });
+      spawn("taskkill", ["/PID", String(pid), "/T", "/F"], { shell: false, windowsHide: true });
     } else {
       r.child.kill("SIGTERM");
     }
