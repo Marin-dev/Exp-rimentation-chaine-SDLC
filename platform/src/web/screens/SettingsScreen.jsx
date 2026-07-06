@@ -12,7 +12,8 @@ import {
   Library,
   X,
   FolderPlus,
-  Rocket
+  Rocket,
+  Gauge
 } from "lucide-react";
 import { Api } from "../api.js";
 import { Card, EmptyState, useEscToClose } from "../components/ui.jsx";
@@ -107,6 +108,154 @@ function LibraryPolicyCard({ state, onStateChange }) {
 
       <button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>
         {saved ? "Enregistré" : busy ? "Enregistrement…" : "Enregistrer la politique"}
+      </button>
+    </Card>
+  );
+}
+
+function ExecutionModeCard({ state, onStateChange }) {
+  const current = state.config?.permissionMode || "bypassPermissions";
+  const [mode, setMode] = useState(current);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    setSaved(false);
+    try {
+      const next = await Api.setPermissionMode(mode);
+      onStateChange(next);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-5 mb-4">
+      <h3 className="text-base font-bold mt-0 mb-1 flex items-center gap-2">
+        <Rocket size={17} className="text-ey-gray01" /> Exécution des commandes par les agents
+      </h3>
+      <p className="text-ey-gray01 text-[13px] mt-0 mb-3">
+        Les agents tournent en mode non-interactif : ils ne peuvent pas répondre à une demande
+        d'autorisation de la CLI. La validation humaine passe par le protocole de la plateforme
+        (décisions / demandes), pas par ces invites.
+      </p>
+
+      <div className="flex flex-col gap-2 mb-3">
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input type="radio" className="radio radio-sm mt-0.5" checked={mode === "bypassPermissions"} onChange={() => setMode("bypassPermissions")} />
+          <span>
+            <b className="text-[13.5px]">Autonome (recommandé)</b>
+            <span className="block text-[12.5px] text-ey-gray01">
+              Les agents exécutent les commandes nécessaires (déploiement, <code>az</code>, <code>npm</code>, tests…)
+              sans blocage. Indispensable pour « fais tout depuis ton côté ».
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input type="radio" className="radio radio-sm mt-0.5" checked={mode === "acceptEdits"} onChange={() => setMode("acceptEdits")} />
+          <span>
+            <b className="text-[13.5px]">Fichiers seulement</b>
+            <span className="block text-[12.5px] text-ey-gray01">
+              Les agents peuvent écrire des fichiers mais <b>toute commande shell est bloquée</b> (le run
+              s'arrête faute de pouvoir demander l'autorisation). À n'utiliser que si c'est voulu.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <button className="btn btn-primary btn-sm" onClick={save} disabled={busy || mode === current}>
+        {saved ? "Enregistré" : busy ? "Enregistrement…" : "Enregistrer le mode"}
+      </button>
+    </Card>
+  );
+}
+
+const ESCALATION_MODES = [
+  { id: "expert-blocked", label: "Seulement si l'expert est bloqué", hint: "L'agent expert tranche par défaut ; tu n'es sollicité que s'il ne peut pas décider seul." },
+  { id: "structural", label: "Décisions structurantes / irréversibles", hint: "Les choix courants sont délégués ; les choix structurants ou irréversibles remontent vers toi." },
+  { id: "always-delegate", label: "Jamais — délègue toujours", hint: "L'expert décide toujours ; tu n'es jamais interrompu en cours de route." }
+];
+
+function AutopilotSettingsCard({ state, onStateChange }) {
+  const current = state.config?.autopilot || {};
+  const [maxIterations, setMaxIterations] = useState(current.maxIterations ?? 30);
+  const [budgetUsd, setBudgetUsd] = useState(current.budgetUsd ?? 10);
+  const [maxConcurrent, setMaxConcurrent] = useState(current.maxConcurrent ?? 1);
+  const [escalation, setEscalation] = useState(current.escalation || "expert-blocked");
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    setSaved(false);
+    try {
+      const next = await Api.setAutopilotSettings({
+        maxIterations: Number(maxIterations) || 0,
+        budgetUsd: Number(budgetUsd) || 0,
+        maxConcurrent: Math.max(1, Number(maxConcurrent) || 1),
+        escalation
+      });
+      onStateChange(next);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-5 mb-4">
+      <h3 className="text-base font-bold mt-0 mb-1 flex items-center gap-2">
+        <Gauge size={17} className="text-ey-gray01" /> Gestion automatique (autopilote)
+      </h3>
+      <p className="text-ey-gray01 text-[13px] mt-0 mb-3">
+        Quand elle est activée depuis l'écran Orchestrateur, l'orchestrateur pilote seul : il planifie,
+        lance les agents et fait trancher les experts. Ces réglages bornent son autonomie.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+        <label className="block">
+          <span className="block text-[12.5px] font-semibold mb-1">Plafond de dépense (USD)</span>
+          <input type="number" min="0" step="1" className="input input-bordered input-sm w-full" value={budgetUsd} onChange={(e) => setBudgetUsd(e.target.value)} />
+          <span className="block text-[11px] text-ey-gray02 mt-1">0 = pas de limite de coût.</span>
+        </label>
+        <label className="block">
+          <span className="block text-[12.5px] font-semibold mb-1">Tours maximum</span>
+          <input type="number" min="0" step="1" className="input input-bordered input-sm w-full" value={maxIterations} onChange={(e) => setMaxIterations(e.target.value)} />
+          <span className="block text-[11px] text-ey-gray02 mt-1">Nombre max de cycles d'orchestration.</span>
+        </label>
+        <label className="block">
+          <span className="block text-[12.5px] font-semibold mb-1">Agents simultanés</span>
+          <input type="number" min="1" step="1" className="input input-bordered input-sm w-full" value={maxConcurrent} onChange={(e) => setMaxConcurrent(e.target.value)} />
+          <span className="block text-[11px] text-ey-gray02 mt-1">Runs lancés en parallèle avant de planifier la suite.</span>
+        </label>
+      </div>
+
+      <div className="mb-3">
+        <span className="block text-[12.5px] font-semibold mb-1.5">Quand s'arrêter pour te demander</span>
+        <div className="flex flex-col gap-2">
+          {ESCALATION_MODES.map((m) => (
+            <label key={m.id} className="flex items-start gap-2.5 cursor-pointer">
+              <input type="radio" className="radio radio-sm mt-0.5" checked={escalation === m.id} onChange={() => setEscalation(m.id)} />
+              <span>
+                <b className="text-[13.5px]">{m.label}</b>
+                <span className="block text-[12.5px] text-ey-gray01">{m.hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 rounded-md bg-base-200 border border-ey-border px-3 py-2 mb-3 text-[12px] text-ey-gray01">
+        <Gauge size={14} className="shrink-0" />
+        Les actions externes (git push, publication GitHub, lancement du produit) restent toujours manuelles.
+      </div>
+
+      <button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>
+        {saved ? "Enregistré" : busy ? "Enregistrement…" : "Enregistrer les réglages"}
       </button>
     </Card>
   );
@@ -493,6 +642,12 @@ export default function SettingsScreen({ state, onStateChange }) {
         {newMsg ? <div className="text-success text-sm mt-2">{newMsg}</div> : null}
         {newErr ? <div className="alert alert-error text-sm mt-2">{newErr}</div> : null}
       </Card>
+
+      {/* Autopilot */}
+      <AutopilotSettingsCard state={state} onStateChange={onStateChange} />
+
+      {/* Execution / permission mode */}
+      <ExecutionModeCard state={state} onStateChange={onStateChange} />
 
       {/* Library policy */}
       <LibraryPolicyCard state={state} onStateChange={onStateChange} />

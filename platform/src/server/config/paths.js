@@ -42,8 +42,16 @@ export function createWorkspacePaths(workspaceRootInput = defaultWorkspaceRoot) 
     livrablesDir,
     gatesDir: path.join(livrablesDir, "_governance", "gates"),
     decisionsDir: path.join(livrablesDir, "_governance", "decisions"),
+    // Human-readable risk records (dual-write of the machine risk register).
+    risksDir: path.join(livrablesDir, "_governance", "risks"),
+    // Human-readable task records (dual-write of the machine task register).
+    tasksDir: path.join(livrablesDir, "_governance", "tasks"),
+    // Coherence-audit reports produced by the per-profile / global control runs.
+    auditsDir: path.join(livrablesDir, "_governance", "audits"),
     // structured app state lives next to deliverables but is machine-owned
     projectStateFile: path.join(stateDir, "project-state.json"),
+    // Autopilot session snapshot (status, iterations, escalations) so a restart can resume it.
+    autopilotStateFile: path.join(stateDir, "autopilot-state.json"),
     runsDir: path.join(stateDir, "runs"),
     spendFile: path.join(stateDir, "spend.json"),
     newNeedsFile: path.join(livrablesDir, "00-contexte", "nouveaux-besoins.md"),
@@ -56,6 +64,12 @@ export function createWorkspacePaths(workspaceRootInput = defaultWorkspaceRoot) 
     answersFile: path.join(livrablesDir, "_governance", "agent-io", "answers.json"),
     // AI reports back the actual choices it made for delegated items.
     resolutionsFile: path.join(livrablesDir, "_governance", "agent-io", "resolutions.json"),
+    // AI registers/updates risks it raises (mirrors pending-input.json → decisions).
+    risksInboxFile: path.join(livrablesDir, "_governance", "agent-io", "risks.json"),
+    // The orchestrator proposes launchable actions here; the human confirms in the UI.
+    orchestratorActionsFile: path.join(livrablesDir, "_governance", "agent-io", "orchestrator-actions.json"),
+    // Agents create/update tasks (next-step actions routed to a profile) here.
+    tasksInboxFile: path.join(livrablesDir, "_governance", "agent-io", "tasks.json"),
     uploadsDir: path.join(livrablesDir, "_governance", "agent-io", "uploads"),
     feedbackFile: path.join(livrablesDir, "_governance", "agent-io", "feedback.json")
   };

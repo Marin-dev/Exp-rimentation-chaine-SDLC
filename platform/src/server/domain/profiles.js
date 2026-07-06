@@ -78,6 +78,14 @@ export const PROFILES = [
     agents: ["@qa", "@test-reviewer"]
   },
   {
+    id: "end-user",
+    label: "Utilisateur métier",
+    short: "Métier terrain",
+    color: "#ea580c",
+    description: "Challenge le produit avec la connaissance métier réelle et valide l'adéquation au besoin (recette).",
+    agents: ["@end-user"]
+  },
+  {
     id: "devops",
     label: "DevOps",
     short: "DevOps",

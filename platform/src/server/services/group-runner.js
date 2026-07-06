@@ -1,6 +1,6 @@
 import path from "node:path";
 import { startRun } from "./runs.js";
-import { buildAgentTaskPrompt, libraryPolicyText } from "./run-prompts.js";
+import { buildAgentTaskPrompt, buildDevLanePrompt, buildDevConsolidationPrompt, libraryPolicyText } from "./run-prompts.js";
 import { ingestPendingInput } from "./inbox-ingest.js";
 import { pendingInputsForPhase, markPhaseInputsConsidered } from "./inputs-store.js";
 
@@ -11,6 +11,17 @@ import { pendingInputsForPhase, markPhaseInputsConsidered } from "./inputs-store
  */
 const groups = new Map();
 let seq = 0;
+
+/** All groups (running or done) as flat summaries — used for cross-refresh visibility. */
+export function listGroups() {
+  return [...groups.values()].map((g) => ({
+    id: g.id,
+    phaseId: g.phaseId,
+    status: g.status,
+    currentStage: g.currentStage,
+    agents: g.stages.flatMap((s) => s.agents.map((a) => ({ name: a.name, runId: a.runId, status: a.status })))
+  }));
+}
 
 export function getGroup(id) {
   const g = groups.get(id);
@@ -31,13 +42,23 @@ function runTask(config, paths, group, stageIdx, phase, task) {
     const token = `${phase.id}-${task.agentKey}`.toLowerCase();
     const pendingRel = `livrables/_governance/agent-io/pending-input-${token}.json`;
     const pendingAbs = path.join(paths.agentIoDir, `pending-input-${token}.json`);
-    const prompt =
-      buildAgentTaskPrompt(phase, task, { pendingFile: pendingRel, inputs: pendingInputsForPhase(paths, phase.id) }) +
-      libraryPolicyText(config);
-    const entry = { name: task.agent, runId: null, status: "running" };
+    let taskPrompt;
+    if (task.kind === "dev-lane") {
+      taskPrompt = buildDevLanePrompt(task, { pendingFile: pendingRel });
+    } else if (task.kind === "dev-consolidate") {
+      taskPrompt = buildDevConsolidationPrompt({ pendingFile: pendingRel });
+    } else {
+      taskPrompt = buildAgentTaskPrompt(phase, task, {
+        pendingFile: pendingRel,
+        inputs: pendingInputsForPhase(paths, phase.id)
+      });
+    }
+    const prompt = taskPrompt + libraryPolicyText(config);
+    const laneLabel = task.bc ? `${task.agent} · ${task.bc}` : task.agent;
+    const entry = { name: laneLabel, runId: null, status: "running" };
     group.stages[stageIdx].agents.push(entry);
     const runId = startRun(config, {
-      label: `${phase.id} · ${task.agent}`,
+      label: `${phase.id} · ${laneLabel}`,
       kind: "parallel",
       phaseId: phase.id,
       agent: task.agent,

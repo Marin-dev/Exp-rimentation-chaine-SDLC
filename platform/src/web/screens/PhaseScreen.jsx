@@ -14,7 +14,39 @@ import {
   HelpCircle,
   Scale
 } from "lucide-react";
-import { ClipboardCheck, MessageCircle, Wand2 } from "lucide-react";
+import { ClipboardCheck, MessageCircle, Wand2, ListChecks } from "lucide-react";
+
+/** Open tasks routed to a profile that are attached to this phase (gate integration). */
+function PhaseTasks({ phaseId, tasks, onNavigate }) {
+  const open = (tasks || []).filter((t) => t.phaseId === phaseId && (t.status === "todo" || t.status === "in-progress"));
+  if (!open.length) return null;
+  return (
+    <div className="mt-7">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[15px] font-bold flex items-center gap-2">
+          <ListChecks size={17} className="text-ey-gray01" /> Tâches de cette étape ({open.length})
+        </h3>
+        <button className="btn btn-ghost btn-xs gap-1" onClick={() => onNavigate("tasks")}>
+          Gérer <ArrowRight size={13} />
+        </button>
+      </div>
+      <div className="border border-ey-border rounded-lg overflow-hidden">
+        {open.map((t) => (
+          <div key={t.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-ey-border last:border-0">
+            <span className="text-[11px] font-mono text-ey-gray02">{t.id}</span>
+            <span className="text-[13px] font-medium flex-1 truncate">{t.title}</span>
+            <span className="inline-flex items-center gap-1.5 text-[11.5px] px-2 py-0.5 rounded whitespace-nowrap"
+              style={{ background: `${t.targetProfileColor}1a`, color: "#2E2E38" }}>
+              <span className="w-2 h-2 rounded-full" style={{ background: t.targetProfileColor }} />
+              {t.targetProfileLabel}
+            </span>
+            <span className="text-[11px] text-ey-gray01">{t.status === "in-progress" ? "En cours" : "À faire"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 import { Api } from "../api.js";
 import { Card, GateBadge, EmptyState } from "../components/ui.jsx";
 import BulkBar from "../components/BulkBar.jsx";
@@ -25,6 +57,7 @@ import DocTypeTabs from "../components/DocTypeTabs.jsx";
 import RunNextSteps from "../components/RunNextSteps.jsx";
 import ParallelRunView from "../components/ParallelRunView.jsx";
 import PhaseInputs from "../components/PhaseInputs.jsx";
+import UsReport from "../components/UsReport.jsx";
 
 function ItemRow({ d, onOpen, selectable, selected, onToggle }) {
   const Icon = d.type === "question" ? HelpCircle : Scale;
@@ -80,11 +113,14 @@ export default function PhaseScreen({
   profile,
   activeRun,
   activeGroup,
+  active,
   onOpenDecision,
   onResume,
   onLaunchPhase,
   onLaunchParallel,
+  onLaunchDevBatches,
   onLaunchReview,
+  onRemediateRisks,
   onNavigate,
   onGoPhase,
   onBack,
@@ -101,7 +137,11 @@ export default function PhaseScreen({
   const [showChat, setShowChat] = useState(false);
   const [chatSeed, setChatSeed] = useState(null);
   const [runDone, setRunDone] = useState(false);
-  useEffect(() => { setRunDone(false); }, [(activeRun && activeRun.id) || (activeGroup && activeGroup.groupId) || null]);
+  // Prefer the freshly-launched run/group; otherwise recover any run still running
+  // for this phase (server-side), so a page refresh doesn't hide live work.
+  const liveGroup = activeGroup || (active?.groups || []).find((g) => g.phaseId === phaseId) || null;
+  const liveRun = activeRun || (active?.runs || []).find((r) => r.phaseId === phaseId && r.kind !== "parallel") || null;
+  useEffect(() => { setRunDone(false); }, [(liveRun && liveRun.id) || (liveGroup && liveGroup.groupId) || null]);
   if (!phase) return null;
 
   function runConsigne(text) {
@@ -133,7 +173,10 @@ export default function PhaseScreen({
   });
   const blocked = pending.length > 0;
   const isG0 = phaseId === "G0";
+  const isG5 = phaseId === "G5";
   const gatePassed = passed(phase.gateStatus);
+  const withRisk = phase.gateStatus === "PASS_WITH_RISK";
+  const isFail = phase.gateStatus === "FAIL";
   const notStarted = !blocked && !relaunchRun && !gatePassed;
 
   function toggle(id) {
@@ -196,11 +239,55 @@ export default function PhaseScreen({
         </div>
       </div>
 
+      {/* Gate FAIL ou PASS_WITH_RISK : proposer de corriger, pas seulement d'avancer/relancer */}
+      {(withRisk || isFail) && !liveRun && !liveGroup && onRemediateRisks ? (
+        <div
+          className="mt-4 flex items-start gap-3 rounded-lg border px-4 py-3"
+          style={isFail ? { borderColor: "#F0A9A0", background: "#FDEBEA" } : { borderColor: "#F0C27A", background: "#FFF3DF" }}
+        >
+          <AlertTriangle size={20} className="shrink-0 mt-0.5" style={{ color: isFail ? "#B42318" : "#A15C07" }} />
+          <div className="flex-1 text-[13.5px]">
+            {isFail ? (
+              <>
+                <b style={{ color: "#B42318" }}>Bloqué.</b> La revue a refusé cette étape. Vous pouvez demander à
+                l'agent de <b>lever les points bloquants</b> du rapport (et d'escalader au bon profil ceux qui ne
+                le concernent pas), puis de réévaluer la validation — plutôt que de rester bloqué.
+              </>
+            ) : (
+              <>
+                <b style={{ color: "#A15C07" }}>Validé avec risque.</b> Vous pouvez demander à l'agent de corriger
+                les risques acceptés et de réévaluer la validation, au lieu de simplement passer à l'étape suivante.
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {phase.gateFile ? (
+              <button
+                className="btn btn-ghost btn-sm gap-1.5"
+                onClick={() =>
+                  setOpenDoc({
+                    path: `livrables/_governance/gates/${phase.gateFile}`,
+                    title: `Rapport de validation ${phase.id}`,
+                    name: phase.gateFile,
+                    phaseId
+                  })
+                }
+              >
+                <FileText size={15} /> {isFail ? "Voir les points bloquants" : "Voir les risques"}
+              </button>
+            ) : null}
+            <button className="btn btn-primary btn-sm gap-1.5" onClick={() => onRemediateRisks(phaseId)}>
+              <Wand2 size={15} /> {isFail ? "Corriger les points bloquants" : "Corriger les risques"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* Live run */}
-      {activeGroup ? (
+      {liveGroup ? (
         <div className="mt-4">
           <ParallelRunView
-            groupId={activeGroup.groupId}
+            groupId={liveGroup.groupId}
             onDone={() => { onStateRefresh(); setRunDone(true); }}
           />
           {runDone ? (
@@ -213,17 +300,17 @@ export default function PhaseScreen({
             />
           ) : null}
         </div>
-      ) : activeRun ? (
+      ) : liveRun ? (
         <div className="mt-4">
           <RunConsole
-            runId={activeRun.id}
-            label={activeRun.label}
+            runId={liveRun.id}
+            label={liveRun.label}
             onDone={() => { onStateRefresh(); setRunDone(true); }}
           />
           {runDone ? (
             <RunNextSteps
               state={state}
-              runId={activeRun.id}
+              runId={liveRun.id}
               phaseId={phaseId}
               onOpenDecision={onOpenDecision}
               onNavigate={onNavigate}
@@ -285,9 +372,20 @@ export default function PhaseScreen({
                   </>
                 )}
               </div>
-              <button className="btn btn-primary btn-sm gap-1.5" onClick={launch}>
-                <Play size={15} /> {launchLabel}
-              </button>
+              <div className="flex items-center gap-2">
+                {isG5 && onLaunchDevBatches ? (
+                  <button
+                    className="btn btn-outline btn-sm gap-1.5"
+                    title="Développe les User Stories en vagues parallèles regroupées par Bounded Context"
+                    onClick={() => onLaunchDevBatches(phaseId)}
+                  >
+                    <Play size={15} /> Dev par batch (BC)
+                  </button>
+                ) : null}
+                <button className="btn btn-primary btn-sm gap-1.5" onClick={launch}>
+                  <Play size={15} /> {launchLabel}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-3 rounded-lg border border-ey-border bg-base-200 px-4 py-3">
@@ -295,14 +393,31 @@ export default function PhaseScreen({
                 <CheckCircle2 size={18} className="text-ey-gray01" /> Rien en attente sur cette étape.
               </div>
               {!isG0 ? (
-                <button className="btn btn-outline btn-sm gap-1.5" onClick={launch}>
-                  <Play size={15} /> {launchLabel}
-                </button>
+                <div className="flex items-center gap-2">
+                  {isG5 && onLaunchDevBatches ? (
+                    <button
+                      className="btn btn-outline btn-sm gap-1.5"
+                      title="Développe les User Stories en vagues parallèles regroupées par Bounded Context"
+                      onClick={() => onLaunchDevBatches(phaseId)}
+                    >
+                      <Play size={15} /> Dev par batch (BC)
+                    </button>
+                  ) : null}
+                  <button className="btn btn-outline btn-sm gap-1.5" onClick={launch}>
+                    <Play size={15} /> {launchLabel}
+                  </button>
+                </div>
               ) : null}
             </div>
           )}
         </div>
       )}
+
+      {/* Rapport de développement des User Stories (zone dev G5) */}
+      {isG5 ? <UsReport version={docCount} onOpenDoc={setOpenDoc} /> : null}
+
+      {/* Tâches ouvertes rattachées à cette étape */}
+      <PhaseTasks phaseId={phaseId} tasks={state.tasks || []} onNavigate={onNavigate} />
 
       {/* Documents d'entrée (sources fournies par l'humain) */}
       <PhaseInputs phase={phase} onStateChange={onStateChange} />
@@ -359,7 +474,7 @@ export default function PhaseScreen({
             <button
               className="btn btn-outline btn-sm gap-1.5"
               onClick={() => onLaunchReview(phaseId)}
-              disabled={docCount === 0 || Boolean(activeRun)}
+              disabled={docCount === 0 || Boolean(liveRun)}
               title={docCount === 0 ? "Aucun livrable à évaluer" : ""}
             >
               <ClipboardCheck size={15} /> Lancer la revue
@@ -401,6 +516,7 @@ export default function PhaseScreen({
               profileObj={profileObj}
               onRunDone={onStateRefresh}
               seed={chatSeed}
+              threadKey={`phase:${state?.config?.workspaceRoot || ""}:${phaseId}`}
             />
           ) : (
             <Card className="p-4 flex items-center gap-3">

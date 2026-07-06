@@ -115,6 +115,22 @@ export const PHASES = [
     ]
   },
   {
+    id: "G6R",
+    title: "Recette métier",
+    subtitle: "Acceptation utilisateur",
+    plain: "Un utilisateur métier vérifie que le produit livré répond vraiment au besoin réel, avant de décider la livraison.",
+    folders: ["09-feedback"],
+    ownerProfiles: ["end-user"],
+    human: "Valider que le produit répond au besoin réel des utilisateurs, et remonter les écarts bloquants.",
+    agents: "@end-user",
+    gateFile: "G6R-recette-metier",
+    goal: "Faire valider par un utilisateur métier que les fonctionnalités livrées répondent au besoin réel (personas, parcours, User Stories) : compréhension, vocabulaire, valeur perçue, adéquation au workflow. Produire un rapport d'acceptation et lever les écarts bloquants vers le PO et le développeur.",
+    produces: [
+      "/livrables/09-feedback/recette-acceptation.md",
+      "/livrables/_governance/gates/G6R-recette-metier.md"
+    ]
+  },
+  {
     id: "G7",
     title: "Release",
     subtitle: "Décision de livraison",
@@ -141,6 +157,7 @@ export const PRODUCERS = {
   G4: "@po",
   G5: "@developpeur",
   G6: "@qa",
+  G6R: "@end-user",
   G7: "@devops"
 };
 export const REVIEWERS = {
@@ -151,6 +168,8 @@ export const REVIEWERS = {
   G4: "@spec-reviewer",
   G5: "@code-quality-reviewer",
   G6: "@test-reviewer + @appsec-reviewer",
+  // The acceptance IS the review — @end-user writes the gate itself (no separate reviewer).
+  G6R: null,
   G7: "@release-judge"
 };
 

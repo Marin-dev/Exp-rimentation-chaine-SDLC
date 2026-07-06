@@ -38,6 +38,11 @@ export const PHASE_INSTRUCTIONS = {
     { label: "Rejouer après corrections", text: "Rejoue les tests sur les US corrigées par le développeur et mets à jour les rapports." },
     { label: "Scénarios & jeux de données", text: "Produis les scénarios de test et les jeux de données nécessaires." }
   ],
+  G6R: [
+    { label: "Recette de la feature", text: "Mets-toi à la place de l'utilisateur métier cible et évalue si les fonctionnalités livrées répondent au besoin réel (compréhension, vocabulaire, valeur, adéquation au workflow). Produis le rapport d'acceptation et rends le gate G6R." },
+    { label: "Remonter les écarts bloquants", text: "Liste les écarts bloquants entre le produit livré et le besoin réel, et route-les vers le PO (backlog) et le développeur via le protocole." },
+    { label: "Challenger le vocabulaire", text: "Repère les écarts entre le vocabulaire affiché et le langage réel des utilisateurs, et recommande des ajustements à l'UX et à l'architecte métier." }
+  ],
   G7: [
     { label: "Préparer la release", text: "Prépare le pipeline CI/CD, la stratégie de déploiement, le monitoring et le rollback dans /livrables/08-devops/." },
     { label: "Décider la release", text: "Évalue la readiness opérationnelle et les risques résiduels, puis rends la décision de release." }

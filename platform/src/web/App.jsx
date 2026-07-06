@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Sparkles, AlertTriangle, X } from "lucide-react";
 import { Api } from "./api.js";
 import Layout from "./components/Layout.jsx";
@@ -6,19 +6,27 @@ import DashboardScreen from "./screens/DashboardScreen.jsx";
 import PipelineScreen from "./screens/PipelineScreen.jsx";
 import DocumentsScreen from "./screens/DocumentsScreen.jsx";
 import DecisionsScreen from "./screens/DecisionsScreen.jsx";
+import RisksScreen from "./screens/RisksScreen.jsx";
+import TasksScreen from "./screens/TasksScreen.jsx";
 import LaunchScreen from "./screens/LaunchScreen.jsx";
 import LaunchAppScreen from "./screens/LaunchAppScreen.jsx";
 import CostScreen from "./screens/CostScreen.jsx";
 import ActivityScreen from "./screens/ActivityScreen.jsx";
+import OrchestratorScreen from "./screens/OrchestratorScreen.jsx";
 import PhaseScreen from "./screens/PhaseScreen.jsx";
 import GitScreen from "./screens/GitScreen.jsx";
 import SettingsScreen from "./screens/SettingsScreen.jsx";
 import DecisionDetailModal from "./components/DecisionDetailModal.jsx";
+import RiskDetailModal from "./components/RiskDetailModal.jsx";
 import CreateDecisionModal from "./components/CreateDecisionModal.jsx";
+import RunConsole from "./components/RunConsole.jsx";
 
 const TITLES = {
   dashboard: "Accueil",
+  orchestrator: "Orchestrateur",
   decisions: "Décisions",
+  risks: "Risques",
+  tasks: "Tâches",
   pipeline: "Avancement",
   activity: "Activité",
   cost: "Coûts",
@@ -40,10 +48,16 @@ export default function App() {
   const [docFilter, setDocFilter] = useState(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState(null);
   const [openDecision, setOpenDecision] = useState(null);
+  const [openRisk, setOpenRisk] = useState(null);
+  const staleTicksRef = useRef(0);
   const [showCreateDecision, setShowCreateDecision] = useState(false);
   const [activeRun, setActiveRun] = useState(null);
   const [activeGroup, setActiveGroup] = useState(null);
   const [resume, setResume] = useState(null);
+  const [active, setActive] = useState({ runs: [], groups: [] });
+  // Live console for ANY running agent (resolution, audit, remediation, phase…),
+  // opened from the header indicator regardless of the run's phase.
+  const [openRun, setOpenRun] = useState(null);
 
   function load() {
     Api.getState()
@@ -53,6 +67,27 @@ export default function App() {
 
   function refreshState() {
     Api.getState().then(setState).catch(() => {});
+    refreshActive();
+  }
+
+  // Which agents/groups are running right now (server-side truth), so the UI
+  // recovers live state after a page refresh instead of losing track of runs.
+  function refreshActive() {
+    Api.getActiveRuns()
+      .then((r) => {
+        const runs = r.runs || [];
+        setActive({ runs, groups: r.groups || [] });
+        // Drop a stale activeRun: if the server no longer reports it running for two
+        // consecutive polls (~8s grace so a just-launched run can appear), clear it —
+        // otherwise a finished/gone run would keep a phase stuck on "En cours".
+        setActiveRun((cur) => {
+          if (!cur) return cur;
+          if (runs.some((x) => x.id === cur.id)) { staleTicksRef.current = 0; return cur; }
+          staleTicksRef.current += 1;
+          return staleTicksRef.current >= 2 ? null : cur;
+        });
+      })
+      .catch(() => {});
   }
 
   function onBulkDone(nextState, resumableRuns) {
@@ -112,6 +147,25 @@ export default function App() {
     }
   }
 
+  // G5: launch development in parallel batches grouped by Bounded Context.
+  async function startDevBatches(phaseId) {
+    try {
+      const res = await Api.startDevBatches();
+      if (!res.groupId) {
+        setNotice({ type: "info", text: res.message || "Aucune User Story à développer." });
+        return;
+      }
+      const w = (res.meta && res.meta.waves ? res.meta.waves.length : 0);
+      setNotice({ type: "info", text: `Dev par batch lancé : ${res.meta?.todo ?? "?"} US en ${w} vagues (par Bounded Context).` });
+      setActiveRun(null);
+      setActiveGroup({ groupId: res.groupId, phaseId });
+      setSelectedPhaseId(phaseId);
+      setScreen("phase");
+    } catch (e) {
+      setNotice({ type: "error", text: e.message });
+    }
+  }
+
   function impactFromDoc(doc, comment) {
     if (!comment) return;
     startNewNeed(`Retour sur le document « ${doc.title} » (${doc.path}) : ${comment}`, [doc.path]);
@@ -142,8 +196,24 @@ export default function App() {
     }
   }
 
+  // PASS_WITH_RISK / FAIL: relaunch the producer agent to fix what the gate flagged + re-evaluate.
+  async function startRemediation(phaseId) {
+    try {
+      const res = await Api.remediateRisks(phaseId);
+      setActiveGroup(null);
+      setActiveRun({ id: res.runId, label: `${phaseId} · Correction des points bloquants`, phaseId });
+      setSelectedPhaseId(phaseId);
+      setScreen("phase");
+    } catch (e) {
+      setNotice({ type: "error", text: e.message });
+    }
+  }
+
   useEffect(() => {
     load();
+    refreshActive();
+    const t = setInterval(refreshActive, 4000);
+    return () => clearInterval(t);
   }, []);
 
   // Auto-dismiss action toasts after a few seconds.
@@ -206,6 +276,9 @@ export default function App() {
         onProfileChange={changeProfile}
         title={screen === "phase" ? `Étape ${selectedPhaseId || ""}` : TITLES[screen]}
         crumb={state.config.workspaceRoot}
+        activeRuns={active.runs}
+        onOpenPhase={(id) => { setSelectedPhaseId(id); setScreen("phase"); }}
+        onOpenRun={(r) => setOpenRun({ id: r.id, label: r.agent ? `${r.agent}${r.phaseId ? " · " + r.phaseId : ""}` : (r.label || "Travail de l'IA") })}
       >
         {screen === "dashboard" ? (
           <DashboardScreen
@@ -223,7 +296,19 @@ export default function App() {
             onOpenDecision={setOpenDecision}
             onRequestCreate={() => setShowCreateDecision(true)}
             onBulkDone={onBulkDone}
+            onStateChange={setState}
           />
+        ) : null}
+        {screen === "risks" ? (
+          <RisksScreen
+            state={state}
+            profile={profile}
+            onOpenRisk={setOpenRisk}
+            onStateChange={setState}
+          />
+        ) : null}
+        {screen === "tasks" ? (
+          <TasksScreen state={state} profile={profile} onStateChange={setState} />
         ) : null}
         {screen === "launch" ? (
           <LaunchScreen
@@ -247,11 +332,14 @@ export default function App() {
             profile={profile}
             activeRun={activeRun && activeRun.phaseId === selectedPhaseId ? activeRun : null}
             activeGroup={activeGroup && activeGroup.phaseId === selectedPhaseId ? activeGroup : null}
+            active={active}
             onOpenDecision={setOpenDecision}
             onResume={startResume}
             onLaunchPhase={startPhaseRun}
             onLaunchParallel={startPhaseParallel}
+            onLaunchDevBatches={startDevBatches}
             onLaunchReview={startReviewRun}
+            onRemediateRisks={startRemediation}
             onGoPhase={(id) => { setSelectedPhaseId(id); setScreen("phase"); }}
             onNavigate={navigate}
             onBack={() => setScreen("pipeline")}
@@ -271,6 +359,7 @@ export default function App() {
           />
         ) : null}
         {screen === "app" ? <LaunchAppScreen /> : null}
+        {screen === "orchestrator" ? <OrchestratorScreen state={state} onStateChange={setState} /> : null}
         {screen === "cost" ? <CostScreen /> : null}
         {screen === "activity" ? (
           <ActivityScreen
@@ -292,6 +381,7 @@ export default function App() {
           profiles={state.profiles}
           currentProfile={profile}
           onStateChange={setState}
+          onResume={(runId, phaseId) => { setOpenDecision(null); startResume(runId, phaseId); }}
           onClose={() => setOpenDecision(null)}
           onAnswered={(next, meta) => {
             setState(next);
@@ -300,6 +390,15 @@ export default function App() {
               setResume({ runId: meta.runId, phaseId: meta.phaseId });
             }
           }}
+        />
+      ) : null}
+
+      {openRisk ? (
+        <RiskDetailModal
+          risk={(state.risks || []).find((r) => r.id === openRisk.id) || openRisk}
+          profile={profile}
+          onStateChange={setState}
+          onClose={() => setOpenRisk(null)}
         />
       ) : null}
 
@@ -345,6 +444,31 @@ export default function App() {
             setShowCreateDecision(false);
           }}
         />
+      ) : null}
+
+      {openRun ? (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4" onClick={() => setOpenRun(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Console de l'agent"
+            className="bg-base-100 rounded-lg shadow-xl w-full max-w-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-ey-border">
+              <h3 className="text-[15px] font-bold m-0">Ce que fait l'agent</h3>
+              <button className="btn btn-ghost btn-sm btn-circle" onClick={() => setOpenRun(null)} aria-label="Fermer">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4">
+              <RunConsole runId={openRun.id} label={openRun.label} onDone={() => refreshState()} />
+              <p className="text-[12px] text-ey-gray01 mt-2 mb-0">
+                Sortie en direct de l'agent. À la fin, ses réponses et documents sont ingérés automatiquement.
+              </p>
+            </div>
+          </div>
+        </div>
       ) : null}
     </>
   );

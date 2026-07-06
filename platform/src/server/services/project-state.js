@@ -4,10 +4,12 @@ import { classifyDoc, phaseDocTypes } from "../domain/doc-types.js";
 import { PHASE_INSTRUCTIONS } from "../domain/instructions.js";
 import { PROFILES, PROFILE_BY_ID } from "../domain/profiles.js";
 import { readGates } from "./gates.js";
+import { closePassedPhaseTasks } from "./coordination.js";
 import { listDeliverables, countDocsByFolders } from "./deliverables.js";
 import { readProject } from "./project.js";
 import { listAgents } from "./agents.js";
 import { listSkills, listMcpServers } from "./resources.js";
+import { readAudits } from "./audit-decisions.js";
 import { readTextSafe, statSafe } from "./fs-utils.js";
 import fs from "node:fs";
 
@@ -41,6 +43,9 @@ export async function buildProjectState(config) {
   const workspaceExists = fs.existsSync(paths.workspaceRoot);
 
   const gates = readGates(paths);
+  // Convergence: close out tasks of any phase whose gate has passed, BEFORE reading the
+  // task register below — a finished phase stops dragging a backlog. Idempotent.
+  try { closePassedPhaseTasks(paths); } catch {}
   const deliverables = listDeliverables(paths);
   // Tag every deliverable with its typology (Epics, User Stories, …).
   for (const group of deliverables) {
@@ -112,6 +117,27 @@ export async function buildProjectState(config) {
     })
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const decisionsPending = decisions.filter((d) => d.status === "pending").length;
+  const rawRisks = Array.isArray(structured.risks) ? structured.risks : [];
+  const risks = rawRisks
+    .map((r) => ({
+      ...r,
+      phaseLabel: r.phaseId ? phaseTitleById[r.phaseId] || r.phaseId : null
+    }))
+    .sort((a, b) => ((a.updatedAt || a.createdAt || "") < (b.updatedAt || b.createdAt || "") ? 1 : -1));
+  const risksOpen = risks.filter((r) => r.status === "open" || r.status === "mitigating").length;
+  const rawTasks = Array.isArray(structured.tasks) ? structured.tasks : [];
+  const tasks = rawTasks
+    .map((t) => {
+      const target = PROFILE_BY_ID[t.targetProfile];
+      return {
+        ...t,
+        targetProfileLabel: target ? target.label : t.targetProfile,
+        targetProfileColor: target ? target.color : "#888",
+        phaseLabel: t.phaseId ? phaseTitleById[t.phaseId] || t.phaseId : null
+      };
+    })
+    .sort((a, b) => ((a.updatedAt || a.createdAt || "") < (b.updatedAt || b.createdAt || "") ? 1 : -1));
+  const tasksOpen = tasks.filter((t) => t.status === "todo" || t.status === "in-progress").length;
 
   // Current phase = first phase whose gate is not yet passed.
   const currentPhase = phases.find((p) => p.gateStatus !== "PASS" && p.gateStatus !== "PASS_WITH_RISK")
@@ -121,7 +147,9 @@ export async function buildProjectState(config) {
     config: {
       workspaceRoot: paths.workspaceRoot,
       workspaceExists,
-      policies: config.policies || { libraries: { mode: "ask", allowed: [] } }
+      policies: config.policies || { libraries: { mode: "ask", allowed: [] } },
+      permissionMode: config.permissionMode || "bypassPermissions",
+      autopilot: config.autopilot || null
     },
     project: {
       ...project,
@@ -141,12 +169,17 @@ export async function buildProjectState(config) {
     skills,
     mcpServers,
     decisions,
+    risks,
+    tasks,
+    audits: readAudits(paths),
     feedback: Array.isArray(structured.feedback) ? structured.feedback : [],
     summary: {
       gatesPassed,
       totalGates: phases.length,
       docsCount,
-      decisionsPending
+      decisionsPending,
+      risksOpen,
+      tasksOpen
     }
   };
 }

@@ -105,7 +105,7 @@ Validation de l'étape :
 - Quand l'étape est complète selon .claude/rules/quality-gates.md, écris ou mets à jour /livrables/_governance/gates/${phase.gateFile || phase.id}.md avec **Status**: PASS (ou FAIL si un élément structurant bloque, ou PASS_WITH_RISK si un risque est explicitement accepté et possédé).
 - Pour toute imprécision, information manquante ou choix structurant qui dépasse les preuves disponibles, pose une question ou une décision via le protocole, routée vers le bon profil.
 ${PARALLEL_HINT}
-${contractBlock()}`;
+${contractBlock()}${taskProtocolText()}`;
 }
 
 /**
@@ -133,6 +133,151 @@ ${PARALLEL_HINT}
 ${contractBlock(pendingFile)}`;
 }
 
+/**
+ * G5 dev lane: one @developpeur scoped to a SINGLE Bounded Context's User Stories,
+ * running in parallel with other BC lanes of the same wave. Anti-collision is by
+ * BC file-ownership + per-US deliverables + deferred governance consolidation.
+ */
+export function buildDevLanePrompt(task, { pendingFile } = {}) {
+  const list = (task.usList || [])
+    .map((u) => `- ${u.id} — ${u.title}${u.integration ? ` [INTÉGRATION inter-BC : ${(u.integrationBCs || []).join(", ")}]` : ""}`)
+    .join("\n");
+  return `Tu agis comme @developpeur pour l'étape G5 (Développement), conformément à CLAUDE.md, .claude/rules/ et .claude/agents/developpeur.md.
+
+Tu es la LANE du Bounded Context ${task.bc} (${task.bcName}). Tu travailles EN PARALLÈLE avec d'autres lanes (d'autres Bounded Contexts) de la même vague. RÈGLES ANTI-COLLISION STRICTES :
+- Tu implémentes UNIQUEMENT les User Stories listées ci-dessous, dans l'ordre.
+- Tu ne modifies QUE les fichiers de code du Bounded Context ${task.bc}. Tu ne touches PAS au code d'un autre Bounded Context.
+- Tu ne modifies PAS les contrats transverses partagés (garde d'accès, journal d'audit, centre de notifications, AppShell/shell). Si une US en a besoin, APPUIE-TOI dessus (lecture/appel) sans les réécrire ; si un changement transverse est vraiment nécessaire, NE le fais pas toi-même : signale-le comme dépendance/point d'intégration via le protocole (type "decision", profil "architecte-technique").
+- Une US marquée [INTÉGRATION inter-BC] touche un contrat partagé avec un autre BC : sois particulièrement prudent, respecte le contrat existant, et documente l'interaction.
+
+User Stories de ta lane (à développer en tranche verticale + tests) :
+${list || "- (aucune)"}
+
+Avant de coder : lis project/PROJECT.md, le design-system et les écrans (02-ui), le modèle de domaine (03-architecture-metier) et les US ci-dessus (05-backlog/user-stories/).
+
+Pour CHAQUE US développée :
+- implémente la tranche verticale (code + tests au bon niveau L1/L2/L3) ;
+- écris la note d'implémentation dans /livrables/06-dev/vertical-slices/US-[NNN]-impl.md (un fichier par US, propre à toi — pas de conflit) ;
+- N'ÉCRIS PAS dans les fichiers de gouvernance partagés (CHANGELOG-actions-agents.md, traceability-matrix.md, journaux) : une étape de CONSOLIDATION s'en chargera après la vague. À la place, dépose un fragment de journal propre à ta lane dans /livrables/06-dev/_journal-fragments/${task.agentKey}.md (créé le dossier si besoin) résumant ce que tu as fait par US.
+
+N'écris PAS le fichier de gate (la revue s'en charge après convergence).
+${contractBlock(pendingFile)}`;
+}
+
+/**
+ * G5 consolidation: single lane, AFTER all dev waves, merges the per-lane journal
+ * fragments and per-US impl notes into the shared governance files exactly once.
+ */
+export function buildDevConsolidationPrompt({ pendingFile } = {}) {
+  return `Tu agis comme @developpeur pour la CONSOLIDATION de gouvernance de l'étape G5, après les vagues de développement par Bounded Context.
+
+Les lanes de dev ont écrit :
+- des notes d'implémentation par US dans /livrables/06-dev/vertical-slices/US-*-impl.md ;
+- des fragments de journal par lane dans /livrables/06-dev/_journal-fragments/*.md.
+
+Ton travail (écriture des fichiers PARTAGÉS, faite une seule fois pour éviter les conflits) :
+1. Consolide toutes les entrées dans /livrables/CHANGELOG-actions-agents.md (une ligne par action, format des conventions).
+2. Mets à jour la matrice de traçabilité /livrables/_governance/traceability-matrix.md : relie chaque US développée à son code, ses tests et sa note d'impl.
+3. Mets à jour le journal /livrables/00-contexte/journaux/journal-developpeur.md à partir des fragments, puis tu peux vider/archiver le dossier _journal-fragments.
+4. Ne réécris PAS le code. Signale toute incohérence entre lanes (contrats transverses divergents, doublons) via le protocole.
+
+${contractBlock(pendingFile)}`;
+}
+
+/**
+ * Agent-to-agent resolution: the profile the item was ROUTED to (e.g. @architecte-technique)
+ * answers a question/decision raised by another agent (e.g. @developpeur). It grounds the
+ * answer in its own deliverables, may update them, and writes a machine-readable resolution
+ * file whose `answer` is fed back to the raising agent.
+ */
+export function buildResolutionAgentPrompt(decision, { mode, humanAnswer, note, resolutionFileRel, targetAgent, pendingFileRel }) {
+  const opts = (decision.options || [])
+    .map((o) => `- ${o.label}${o.detail ? ` — ${o.detail}` : ""}`)
+    .join("\n");
+  const kind = decision.type === "question" ? "une question" : "une décision";
+  const validate = mode === "validate";
+  const roleBlock = validate
+    ? `Un humain propose cette réponse : « ${String(humanAnswer || "").trim()} »${note ? ` (note : ${String(note).trim()})` : ""}.
+Ton rôle : VALIDER ou CORRIGER/ENRICHIR cette réponse à la lumière de TES livrables (architecture, NFR, ADR, contraintes projet). Si elle est juste, approuve-la ; sinon ajuste-la et explique brièvement.`
+    : `Ton rôle : TRANCHER toi-même, en t'appuyant sur TES livrables (architecture, NFR, ADR, contraintes projet) et le périmètre MVP. Choisis la réponse/option la plus pertinente.`;
+  return `Tu agis comme ${targetAgent} (profil « ${decision.targetProfile} »), conformément à CLAUDE.md, .claude/rules/ et ton fichier d'agent.
+
+Un autre agent (${decision.raisedBy || "un agent de la chaîne"}) a soulevé ${kind} qui relève de TON domaine ; elle t'est routée pour que TU la traites et aides le demandeur.
+
+TITRE : ${decision.title}
+CONTEXTE : ${decision.context || decision.summary || "—"}${opts ? `\nOPTIONS :\n${opts}` : ""}
+
+${roleBlock}
+
+Avant de répondre : lis project/PROJECT.md et TES livrables pertinents (ex. 04-architecture-technique, décisions ADR). Si la résolution change ta doctrine, METS À JOUR tes livrables concernés (et, pour un choix structurant, ajoute/actualise un ADR sous /livrables/_governance/decisions/).
+
+Puis ÉCRIS ta réponse finale destinée à l'agent demandeur dans \`${resolutionFileRel}\` (crée le dossier si besoin) AU FORMAT EXACT :
+{
+  "answer": "réponse claire et actionnable que l'agent demandeur doit appliquer",
+  "rationale": "justification brève, avec renvoi aux livrables si pertinent",
+  "deliverablesUpdated": ["chemins des livrables mis à jour, s'il y en a"]
+}
+
+Ta SEULE sortie machine est ce fichier JSON. Si (et seulement si) il te manque une information humaine indispensable pour trancher, tu peux la demander via le protocole ci-dessous ; sinon, tranche et écris le fichier.
+${contractBlock(pendingFileRel)}`;
+}
+
+/**
+ * Coherence-control audit. The agent reviews a set of ALREADY-ANSWERED decisions and
+ * (a) checks they are mutually coherent, (b) verifies each is actually reflected/applied
+ * in the relevant deliverables (not just recorded), so the same questions don't recur.
+ * It writes machine-readable findings; the server reopens the flagged decisions.
+ * scope "profile": TES propres décisions. scope "global": cohérence CROISÉE entre profils.
+ */
+export function buildAuditAgentPrompt({ scope, auditor, profileLabel, decisions, reportFileRel, pendingFileRel }) {
+  const list = (decisions || [])
+    .map((d) => {
+      const ans = d.answer || {};
+      const answer = ans.delegated ? `${ans.choiceLabel || "(délégué)"} [DÉLÉGUÉ À L'IA]` : (ans.choiceLabel || "—");
+      return `- ${d.id} — « ${d.title} »\n    Phase: ${d.phaseId || "—"} · Profil cible: ${d.targetProfile} · Décidé par: ${ans.decidedBy || "—"}\n    Réponse retenue: ${answer}${ans.note ? `\n    Note: ${ans.note}` : ""}`;
+    })
+    .join("\n");
+  const global = scope === "global";
+  const roleBlock = global
+    ? `Tu agis comme ORCHESTRATEUR GLOBAL (${auditor}), garant de la cohérence d'ensemble, conformément à CLAUDE.md et .claude/ORCHESTRATION.md.
+Tu CONTRÔLES la cohérence CROISÉE entre les décisions de TOUS les profils : repère les contradictions entre domaines (ex. un choix technique qui contredit une contrainte sécurité, une décision produit incompatible avec le périmètre MVP, deux décisions qui s'excluent).`
+    : `Tu agis comme ${auditor} (profil « ${profileLabel} »), conformément à CLAUDE.md, .claude/rules/ et ton fichier d'agent.
+Tu CONTRÔLES les décisions qui relèvent de TON domaine : vérifie qu'elles sont mutuellement cohérentes et alignées avec TES livrables et le périmètre MVP.`;
+  return `${roleBlock}
+
+Objectif : un contrôle qualité des décisions DÉJÀ TRANCHÉES (dont certaines ont pu être déléguées à l'IA en masse). Tu ne réponds pas à de nouvelles questions ; tu AUDITES l'existant.
+
+DÉCISIONS À CONTRÔLER :
+${list || "- (aucune)"}
+
+Pour CHAQUE décision, effectue DEUX vérifications :
+1. COHÉRENCE — la décision est-elle compatible avec les autres décisions ci-dessus et avec les livrables/contraintes du projet ? Signale toute contradiction.
+2. DOCUMENTATION — la décision est-elle réellement REFLÉTÉE et APPLIQUÉE dans les livrables concernés (pas seulement enregistrée dans /livrables/_governance/decisions/) ? Ouvre et LIS les livrables pertinents (project/PROJECT.md, la phase concernée dans /livrables/, ADR). Si la décision n'est pas documentée là où elle devrait l'être, la question risque de revenir : signale-la comme "undocumented".
+
+Quand une décision est SAINE (cohérente ET documentée), n'émets PAS de constat pour elle.
+
+Écris ton rapport dans \`${reportFileRel}\` (crée le dossier si besoin) AU FORMAT EXACT :
+{
+  "summary": "synthèse claire et sans jargon de l'état des décisions contrôlées",
+  "findings": [
+    {
+      "decisionId": "l'id exact ci-dessus (ex: DEC-0003)",
+      "kind": "incoherence" | "undocumented",
+      "severity": "normal" | "high",
+      "rationale": "explication précise du problème",
+      "reopen": true | false,
+      "reopenNote": "si reopen=true : consigne claire à afficher au profil pour corriger/documenter"
+    }
+  ]
+}
+- "reopen": true UNIQUEMENT quand le problème exige que le profil retranche ou complète la décision (elle sera renvoyée en attente à ce profil).
+- Pour un "undocumented" que TU peux corriger toi-même en écrivant dans le bon livrable, fais-le MAINTENANT (mets à jour le livrable) et mets "reopen": false en l'expliquant dans "rationale".
+- Si tout est cohérent et documenté, écris {"summary":"...","findings":[]}.
+
+Ta SEULE sortie machine est ce fichier JSON.
+${contractBlock(pendingFileRel)}`;
+}
+
 /** The reviewer evaluates a phase's deliverables and owns the gate decision. */
 export function buildReviewPrompt(phase, reviewer) {
   return `Tu agis comme ${reviewer || "le reviewer de l'étape"} pour la REVUE de l'étape ${phase.id} (${phase.title}), conformément à .claude/rules/quality-gates.md et .claude/rules/judge-rubrics.md.
@@ -146,7 +291,44 @@ Travail attendu :
 4. Rends la décision de gate en écrivant /livrables/_governance/gates/${phase.gateFile || phase.id}.md avec **Status**: PASS / FAIL / PASS_WITH_RISK, les preuves, les problèmes bloquants et la prochaine action.
 5. Pour chaque problème bloquant qui nécessite une décision ou une information humaine, pose-le via le protocole, routé vers le bon profil. Ne valide pas en PASS si des éléments obligatoires manquent (préfère FAIL).
 
-${contractBlock()}`;
+${contractBlock()}${riskRegisterProtocolText()}${taskProtocolText()}`;
+}
+
+/**
+ * Remediation pass: the phase's PRODUCER agent tries to FIX what a gate flagged —
+ * the accepted risks of a PASS_WITH_RISK, or the blocking issues of a FAIL — updating
+ * the deliverables and then re-evaluating the gate. Points owned by another profile
+ * are escalated via the protocol instead of guessed.
+ */
+export function buildRemediationPrompt(phase, agent, gateStatus) {
+  const gateRel = `livrables/_governance/gates/${phase.gateFile || phase.id}.md`;
+  const isFail = gateStatus === "FAIL";
+  const fixLine = phase.id === "G5"
+    ? "corrige le code et les tests des tranches verticales concernées (défauts signalés, tests manquants, dette technique)"
+    : "complète et renforce les livrables concernés";
+  const intro = isFail
+    ? "La revue a REFUSÉ cette étape (Status: FAIL) : des POINTS BLOQUANTS doivent être levés avant validation. Ton objectif est de les traiter, pas seulement de les re-documenter."
+    : "La revue a validé cette étape AVEC RISQUE (Status: PASS_WITH_RISK). Ton objectif est de RÉDUIRE ces risques autant que possible, pas seulement de les re-documenter.";
+  const target = isFail ? "points bloquants (section « Blocking Issues »)" : "risques acceptés / points PASS_WITH_RISK";
+  const reeval = isFail
+    ? `   - **Status**: PASS si tous les points bloquants sont levés ;
+   - **Status**: PASS_WITH_RISK si seuls subsistent des risques mineurs explicitement acceptables (liste-les) ;
+   - sinon garde **Status**: FAIL en listant précisément les points bloquants RESTANTS, ce qui a été traité, et ce qui est en attente (escaladé à qui).`
+    : `   - **Status**: PASS si les risques bloquants sont résolus ;
+   - sinon garde **Status**: PASS_WITH_RISK en listant les risques RÉSIDUELS : ce qui a été corrigé, ce qui reste, et pourquoi.`;
+  return `Tu agis comme ${agent || "l'agent responsable de l'étape"} pour l'étape ${phase.id} (${phase.title}), conformément à CLAUDE.md, .claude/rules/ et ton fichier d'agent.
+
+${intro}
+
+1. Lis le rapport de gate \`${gateRel}\` et identifie précisément les ${target}, leur OWNER indiqué, et la prochaine action recommandée.
+2. Lis les livrables de l'étape dans /livrables/ et le profil projet (project/...).
+3. Pour CHAQUE point qui relève de TON périmètre, CORRIGE-le : ${fixLine}. Mets à jour les livrables Markdown impactés.
+4. Pour un point dont l'OWNER est un AUTRE profil (ex. @developpeur, @architecte-technique, @security-architect), ou qui exige une décision/information humaine, NE devine PAS : pose une décision/question via le protocole, routée vers ce profil, en décrivant précisément ce qui est attendu.
+5. Réévalue et METS À JOUR le gate \`${gateRel}\` :
+${reeval}
+6. Consigne les corrections dans les livrables de l'étape (et le changelog des actions agents si pertinent).
+
+${contractBlock()}${riskRegisterProtocolText()}${taskProtocolText()}`;
 }
 
 /** New business need: triggers the requalification mini-chain across phases. */
@@ -200,6 +382,172 @@ ${message}
 Réponds directement à l'utilisateur (ton conversationnel). ${contractBlock()}`;
 }
 
+/**
+ * Global orchestrator chat: an advisory assistant that answers the human's
+ * questions about project progress, global vision, and what the agents are doing.
+ * It is READ-ONLY: it explains, it does not modify deliverables or launch runs.
+ * A live state snapshot is injected so it can answer "what's happening now".
+ */
+export function buildOrchestratorChatPrompt({ message, history, snapshot, actionsFileRel }) {
+  const hist = (history || [])
+    .slice(-8)
+    .map((m) => `${m.role === "user" ? "UTILISATEUR" : "ORCHESTRATEUR"}: ${m.text}`)
+    .join("\n");
+  return `Tu es l'ORCHESTRATEUR GLOBAL de la chaîne de développement multi-agents SDLC Studio, conformément à CLAUDE.md et .claude/ORCHESTRATION.md.
+
+Un humain (souvent non technique) te parle pour comprendre l'AVANCEMENT et faire AVANCER le projet. Tu es le PILOTE qui coordonne la chaîne : tu expliques, tu PLANIFIES vers un objectif, et tu proposes un lot d'actions borné que l'humain n'a plus qu'à confirmer.
+
+PRINCIPE DE PILOTAGE (le plus important) :
+La chaîne avance par GATES (G0→G7). À tout instant il y a UN SEUL objectif : faire passer le PROCHAIN gate non validé (voir « OBJECTIF COURANT » dans l'instantané). Tu pilotes vers CE gate, et rien d'autre.
+- Ne propose QUE le travail nécessaire pour atteindre l'objectif courant. N'ouvre PAS de fronts sur des étapes ultérieures « pour prendre de l'avance » — c'est exactement ce qui fait diverger le projet.
+- Un lot BORNÉ : idéalement 1 à 3 actions qui, une fois faites, rapprochent concrètement le gate du PASS. Si une seule action suffit, n'en propose qu'une.
+- Quand l'objectif est ATTEINT (le gate passe), la plateforme clôture automatiquement les tâches de cette étape ; l'objectif devient le gate suivant. Si TOUS les gates sont passés, déclare la convergence et ne propose AUCUN travail (sauf demande explicite de l'humain).
+
+RÈGLES :
+- Réponds de façon claire, synthétique, sans jargon, en français.
+- Tu ne modifies PAS les livrables et tu ne lances PAS directement les agents. Tu PROPOSES ; l'humain confirme d'un clic ; la plateforme exécute.
+- Pour cadrer juste, lis si utile : project/PROJECT.md, les livrables (00-contexte, 01-vision, le backlog 05-backlog, les gates dans /livrables/_governance/gates/) et les décisions.
+- Appuie-toi sur l'INSTANTANÉ ci-dessous pour l'état temps réel.
+
+TRIER LES CANDIDATS (ta responsabilité de coordination) :
+Les agents, en travaillant, déposent des « candidats » (handoffs) listés dans l'instantané. Ils n'ouvrent PAS automatiquement de travail : c'est TOI qui décides. Pour chaque candidat pertinent pour l'OBJECTIF COURANT → PROMEUS-le (il devient une tâche à faire). Pour un candidat hors-objectif, prématuré ou redondant → ÉCARTE-le (il ne pollue plus la bannette). Ne laisse pas les candidats s'accumuler.
+
+PLANIFIER (écris tes décisions dans \`${actionsFileRel}\`, crée le dossier si besoin) :
+{
+  "actions": [
+    {
+      "type": "launch_dev | launch_phase | launch_review | remediate | launch_dev_batches | seed_risks",
+      "label": "libellé court et clair (ex. « Revue G2 — UX/UI/domaine »)",
+      "rationale": "en quoi ça rapproche l'OBJECTIF COURANT, en 1 phrase",
+      "phaseId": "G0..G7 (l'étape concernée)",
+      "agent": "@developpeur (pour launch_dev ; sinon omets)",
+      "instruction": "SEULEMENT pour launch_dev : la consigne précise (quoi construire, à partir de quel plan/US, la Definition of Done attendue)"
+    }
+  ],
+  "taskOps": [
+    { "id": "T-012", "op": "promote", "reason": "nécessaire pour l'objectif courant" },
+    { "id": "T-018", "op": "drop", "reason": "concerne une étape ultérieure, prématuré" }
+  ]
+}
+Types d'action :
+- \`launch_dev\` : lancer un agent sur une tâche précise décrite dans \`instruction\` (ex. une vague de construction front depuis un plan). Découpe un gros chantier en plusieurs launch_dev seulement si le parallélisme sert l'objectif courant.
+- \`launch_phase\` : (re)lancer l'agent producteur d'une étape Gx.
+- \`launch_review\` : lancer la revue/gate d'une étape — souvent LE geste qui fait passer l'objectif.
+- \`remediate\` : corriger les points bloquants d'un gate (PASS_WITH_RISK / FAIL).
+- \`launch_dev_batches\` : développement G5 par Bounded Context (US non encore développées).
+- \`seed_risks\` : amorcer le registre des risques.
+Ne propose une action que si elle sert l'objectif MAINTENANT. N'invente pas d'étape déjà faite. Si rien n'est utile (objectif atteint / travail déjà en cours), n'écris pas d'actions — écris au besoin seulement les \`taskOps\`. Fichier vide accepté si vraiment rien à faire.
+
+Dans ta réponse à l'humain : rappelle l'OBJECTIF COURANT en une ligne, explique où on en est vis-à-vis de ce gate, puis annonce le lot proposé (« Pour faire passer Gx, je propose de… — à confirmer »). Dis aussi ce que tu promeus/écartes parmi les candidats et pourquoi. Ne prétends jamais avoir lancé quoi que ce soit.
+
+--- INSTANTANÉ ÉTAT PROJET (au moment de la question) ---
+${snapshot || "(indisponible)"}
+--- FIN INSTANTANÉ ---
+
+${hist ? `Historique récent de la conversation :\n${hist}\n` : ""}
+QUESTION DE L'UTILISATEUR :
+${message}
+
+Réponds directement à l'utilisateur, ton conversationnel et concret.`;
+}
+
+/**
+ * AUTOPILOT planning turn. Same pilot doctrine as the chat orchestrator (drive the single
+ * CURRENT OBJECTIVE, bounded batch, triage candidates) but headless: no human is reading a
+ * reply, so the ONLY output that matters is the actions JSON. The platform launches that
+ * batch automatically and delegates the decisions the agents raise to the domain experts.
+ */
+export function buildAutopilotPlanPrompt({ snapshot, actionsFileRel }) {
+  return `Tu es l'ORCHESTRATEUR GLOBAL de la chaîne SDLC Studio, en MODE AUTOPILOTE (gestion automatique), conformément à CLAUDE.md et .claude/ORCHESTRATION.md.
+
+Aucun humain ne lit de réponse : ta SEULE sortie utile est le fichier d'actions. La plateforme lancera automatiquement le lot que tu proposes et déléguera aux agents experts les décisions qu'ils soulèvent — l'humain n'est sollicité que si un expert reste bloqué.
+
+PRINCIPE DE PILOTAGE :
+La chaîne avance par GATES (G0→G7). À tout instant il y a UN SEUL objectif : faire passer le PROCHAIN gate non validé (voir « OBJECTIF COURANT » dans l'instantané). Tu pilotes vers CE gate, et rien d'autre.
+- Ne propose QUE le travail nécessaire pour atteindre l'objectif courant. N'ouvre PAS de fronts sur des étapes ultérieures.
+- Un lot BORNÉ : idéalement 1 à 3 actions qui rapprochent concrètement le gate du PASS. Souvent l'action décisive est une revue (\`launch_review\`) qui fait passer la gate.
+- Si TOUS les gates sont passés : n'écris AUCUNE action (fichier vide) — la convergence est atteinte.
+- Ne relance pas un travail déjà en cours (voir « Agents en cours »). Ne réinvente pas une étape déjà faite.
+
+TRIER LES CANDIDATS : promeus (\`promote\`) les handoffs d'agents utiles à l'objectif courant, écarte (\`drop\`) ceux hors-objectif / prématurés / redondants. Ne les laisse pas s'accumuler.
+
+ÉCRIS TES DÉCISIONS dans \`${actionsFileRel}\` (crée le dossier si besoin), et RIEN d'autre :
+{
+  "actions": [
+    {
+      "type": "launch_dev | launch_phase | launch_review | remediate | launch_dev_batches | seed_risks",
+      "label": "libellé court et clair",
+      "rationale": "en quoi ça rapproche l'OBJECTIF COURANT, en 1 phrase",
+      "phaseId": "G0..G7",
+      "agent": "@developpeur (pour launch_dev uniquement ; sinon omets)",
+      "instruction": "SEULEMENT pour launch_dev : la consigne précise (quoi construire, depuis quel plan/US, la Definition of Done attendue)"
+    }
+  ],
+  "taskOps": [
+    { "id": "T-012", "op": "promote", "reason": "nécessaire à l'objectif courant" },
+    { "id": "T-018", "op": "drop", "reason": "étape ultérieure, prématuré" }
+  ]
+}
+Si rien n'est utile MAINTENANT (objectif atteint, ou tout le travail utile est déjà en cours), écris un fichier vide (\`{"actions": [], "taskOps": []}\`). Ne propose jamais une action pour « meubler ». Ne prétends pas avoir lancé quoi que ce soit — la plateforme s'en charge.
+
+--- INSTANTANÉ ÉTAT PROJET ---
+${snapshot || "(indisponible)"}
+--- FIN INSTANTANÉ ---`;
+}
+
+/**
+ * A task the orchestrator (confirmed by the human) hands to a specific agent — the
+ * generic "launch an agent on a precise instruction" primitive (e.g. build a front wave).
+ */
+export function buildDirectedAgentPrompt({ agent, instruction, phaseId, pendingFileRel, risksFileRel, tasksFileRel }) {
+  return `Tu agis comme ${agent || "l'agent désigné"} pour l'étape ${phaseId || "en cours"}, conformément à CLAUDE.md, .claude/rules/ et ton fichier d'agent.
+
+L'orchestrateur — sur confirmation explicite de l'humain — te confie cette tâche :
+${instruction || "(voir la conversation)"}
+
+Avant d'agir : lis project/PROJECT.md, les règles (.claude/rules/, notamment quality-gates.md et ui-frontend-quality.md), et les livrables utiles (le plan et les User Stories concernées, le design-system et les écrans sous 02-ui/, l'état d'infrastructure locale).
+Respecte la Definition of Done applicable : pour une User Story user-facing, l'écran doit être RÉELLEMENT monté et câblé (états Chargement / Vide / Erreur), avec une preuve L3/UI exécutée contre le back local. Ne réduis pas le périmètre demandé sans arbitrage humain.
+${contractBlock(pendingFileRel)}${riskRegisterProtocolText(risksFileRel)}${taskProtocolText(tasksFileRel)}`;
+}
+
+/**
+ * Ask a technical agent (@devops or @developpeur) to inspect the DELIVERED product
+ * in the workspace and figure out how to launch it locally (back-end + front-end),
+ * then write a machine-readable launch config the platform ingests into config.app.
+ * The `cwd` fields MUST be absolute paths (the app runner resolves them relative to
+ * the server process, not the workspace).
+ */
+export function buildAppDetectPrompt({ agent, configFileRel, workspaceRoot }) {
+  return `Tu agis comme ${agent}, conformément à CLAUDE.md, .claude/rules/ et ton fichier d'agent.
+
+OBJECTIF : déterminer comment LANCER EN LOCAL le produit développé par la chaîne (back-end + front-end), pour qu'un utilisateur non technique puisse le démarrer d'un clic depuis l'onglet Application.
+
+La racine du workspace est : ${workspaceRoot}
+
+Étapes :
+1. Inspecte le code livré (package.json, scripts npm, Makefile, Dockerfile, README, requirements.txt, dossiers du produit). Le code du produit se trouve typiquement sous /livrables/06-dev/ ou dans un dossier de code applicatif du workspace — repère où vit réellement l'application exécutable (pas les livrables Markdown).
+2. Identifie la commande de démarrage du BACK-END (ex. \`npm run start\`, \`npm run dev\`, \`uvicorn app:app\`) et son dossier de travail.
+3. Identifie la commande de démarrage du FRONT-END (ex. \`npm run dev\`), son dossier de travail, et l'URL locale d'ouverture (ex. http://localhost:5173).
+4. Si l'installation des dépendances est nécessaire au préalable, intègre-la à la commande (ex. \`npm install && npm run dev\`) pour que le démarrage fonctionne du premier coup.
+5. Le produit peut avoir DEUX parties (front + back), ou UNE SEULE. Cas fréquents :
+   - front-end seul (ex. app statique / SPA \`npm run dev\`) → renseigne uniquement \`frontend\` (avec son URL), laisse \`backend\` vide ;
+   - back-end seul, ou UNE app Node unique qui sert aussi son interface (ex. \`npm start\` d'un serveur Express/Next) → renseigne uniquement \`backend\`, ET donne son URL locale dans \`backend.url\` pour qu'on puisse ouvrir l'app ; laisse \`frontend\` vide ;
+   - les deux → renseigne les deux, l'URL d'ouverture étant celle du front-end.
+   Ne remplis JAMAIS une partie inexistante avec une commande inventée : laisse ses champs vides.
+
+Puis ÉCRIS le résultat dans \`${configFileRel}\` (crée le dossier si besoin) AU FORMAT EXACT :
+{
+  "backend": { "command": "commande de démarrage back-end, ou vide", "cwd": "CHEMIN ABSOLU du dossier de travail back-end, ou vide", "url": "URL locale SI le back-end sert aussi l'UI, sinon vide" },
+  "frontend": { "command": "commande de démarrage front-end, ou vide", "cwd": "CHEMIN ABSOLU du dossier de travail front-end, ou vide", "url": "URL locale d'ouverture, ou vide" },
+  "notes": "brève explication de ce que tu as trouvé et de tout prérequis restant"
+}
+
+RÈGLES IMPORTANTES :
+- Les chemins \`cwd\` DOIVENT être ABSOLUS (commence par la racine du workspace ci-dessus).
+- N'invente rien : base-toi sur ce qui existe réellement dans le code. Si tu ne trouves aucune application exécutable, écris des commandes vides et explique-le dans \`notes\`.
+- N'écris QUE ce fichier JSON. Ne modifie pas le code du produit.`;
+}
+
 export function buildResumePrompt({ phaseLabel, agent }) {
   return `Tu reprends le travail de l'étape ${phaseLabel || ""} en agissant comme ${agent || "l'agent responsable"}.
 
@@ -209,4 +557,175 @@ Des réponses humaines viennent d'être fournies dans \`livrables/_governance/ag
 - si l'étape est désormais complète, mets à jour le fichier de gate correspondant.
 
 ${contractBlock()}`;
+}
+
+/**
+ * Reusable protocol appended to reviewer / remediation prompts: any risk raised
+ * (a PASS_WITH_RISK, or a residual risk of a FAIL) must be REGISTERED in the risk
+ * register, not just named in prose. Mirrors the pending-input contract but for risks.
+ */
+export function riskRegisterProtocolText(risksFileRel = "livrables/_governance/agent-io/risks.json") {
+  return `
+
+## Registre des risques (obligatoire)
+Tout risque que tu identifies ou fais évoluer (notamment quand tu poses un gate en \`PASS_WITH_RISK\`, ou un risque résiduel d'un \`FAIL\`) doit être INSCRIT dans le registre, pas seulement mentionné en prose. Écris/complète le tableau JSON dans \`${risksFileRel}\` (crée le fichier si besoin), au format :
+[
+  {
+    "id": "R-<GATE>-NN (réutilise l'id existant si le risque existe déjà, ex. R-G5-05)",
+    "title": "intitulé court du risque",
+    "description": "en quoi consiste le risque et son impact",
+    "severity": "low | medium | high | critical",
+    "phaseId": "G0..G7", "gate": "ex. G6",
+    "owner": "@profil responsable",
+    "status": "open | mitigating | resolved | accepted | closed",
+    "mitigation": "prochaine action pour le réduire/lever",
+    "note": "ce qui a changé (si tu mets à jour un risque existant)"
+  }
+]
+Règles : un risque déjà présent au registre → réutilise son \`id\` et ne change que ce qui évolue (\`status\`, \`mitigation\`). Un \`PASS_WITH_RISK\` ne doit JAMAIS masquer une couche produit entière absente : ça, c'est un \`FAIL\` ou une décision de périmètre, pas un risque accepté.`;
+}
+
+/**
+ * Reusable protocol appended to producer/reviewer/dev prompts: when an agent finishes
+ * and identifies a NEXT-STEP action owned by another profile, it must register it as a
+ * TASK (routed to that profile) instead of only mentioning it in prose — so it is never lost.
+ */
+export function taskProtocolText(tasksFileRel = "livrables/_governance/agent-io/tasks.json") {
+  return `
+
+## Tâches de suivi (obligatoire)
+Si, en terminant, tu identifies une ACTION qui doit être faite par UN AUTRE PROFIL (ex. « le développeur doit reprendre US-030 modifiée », « le PO doit reprioriser »), ne la laisse PAS seulement en prose : ENREGISTRE-la comme tâche dans \`${tasksFileRel}\` (crée le fichier si besoin), un tableau JSON, chaque élément :
+[
+  {
+    "id": "réutilise l'id d'une tâche existante si tu la fais avancer, sinon OMETS-le (créé automatiquement)",
+    "title": "action courte et actionnable",
+    "description": "quoi faire précisément, et à partir de quels livrables",
+    "targetProfile": "profil qui doit la faire : po | developpeur | ux | architecte-metier | architecte-technique | securite | qa | devops | end-user | sponsor",
+    "priority": "low | normal | high",
+    "phaseId": "G0..G7 (étape concernée, si pertinent)",
+    "status": "todo (ou 'done' si tu marques une tâche que TU viens de terminer)"
+  }
+]
+Marque \`done\` toute tâche qui t'était assignée et que tu viens d'accomplir. Ne crée pas de doublon d'une tâche déjà ouverte.`;
+}
+
+/**
+ * Batch execution: one profile's agent is handed SEVERAL tasks at once (e.g. the 3 things
+ * the PO queued for the developer) and must do them all, updating each task's status.
+ */
+export function buildTaskBatchPrompt({ agent, profileLabel, tasks, tasksFileRel, pendingFileRel, risksFileRel }) {
+  const list = (tasks || [])
+    .map((t) => `- ${t.id} — ${t.title}${t.description ? `\n    ${t.description.replace(/\n/g, " ")}` : ""}`)
+    .join("\n");
+  return `Tu agis comme ${agent} (profil « ${profileLabel || ""} »), conformément à CLAUDE.md, .claude/rules/ et ton fichier d'agent.
+
+On te confie ${(tasks || []).length} TÂCHE(S) à réaliser, dans l'ordre :
+${list || "- (aucune)"}
+
+Pour CHAQUE tâche :
+1. Lis les livrables et le contexte nécessaires (project/PROJECT.md, les User Stories/écrans/architecture concernés, l'infrastructure locale).
+2. Réalise le travail demandé et METS À JOUR les livrables (et le code si tu es développeur), en respectant la Definition of Done applicable (.claude/rules/quality-gates.md) — pour une US user-facing, l'écran doit être réellement livré (états + preuve L3/UI).
+3. MARQUE la tâche \`done\` dans \`${tasksFileRel}\` (réutilise son \`id\`), avec une brève note de ce que tu as fait. Si tu ne peux pas la finir, laisse-la \`in-progress\` et explique le blocage.
+4. Si une tâche exige une décision/information d'un autre profil, pose-la via le protocole (ci-dessous), routée vers ce profil — ne devine pas.
+
+${contractBlock(pendingFileRel)}${riskRegisterProtocolText(risksFileRel)}${taskProtocolText(tasksFileRel)}`;
+}
+
+/**
+ * A specialist agent (the risk's owner) is asked to TREAT a specific risk: mitigate it
+ * in its own deliverables, update the risk's status, and — when it needs input from the
+ * raiser or another profile — open a dialogue via the decision protocol (pending-input).
+ */
+export function buildRiskResolutionPrompt(risk, { agent, risksFileRel, pendingFileRel }) {
+  return `Tu agis comme ${agent} (profil propriétaire de ce risque), conformément à CLAUDE.md, .claude/rules/ et ton fichier d'agent.
+
+Un risque de TON domaine t'est confié pour TRAITEMENT.
+
+RISQUE ${risk.id} — ${risk.title}
+Sévérité : ${risk.severity}. Origine : ${risk.gate || risk.phaseId || "—"}. Soulevé par : ${risk.raisedBy || "—"}.
+Description : ${risk.description || "—"}
+${risk.mitigation ? `Piste de mitigation déjà notée : ${risk.mitigation}` : ""}
+
+Ton travail :
+1. Lis project/PROJECT.md et TES livrables pertinents pour ce risque (architecture, sécurité, NFR, ADR, tests…).
+2. APPLIQUE une mitigation concrète dans tes livrables (mets-les à jour ; ajoute/actualise un ADR sous /livrables/_governance/decisions/ si c'est un choix structurant). Ne te contente pas de re-décrire le risque.
+3. METS À JOUR le risque \`${risk.id}\` (voir protocole registre ci-dessous) : \`status\` = \`resolved\` UNIQUEMENT si le risque est réellement levé avec une PREUVE (test exécuté, livrable à jour) ; sinon \`mitigating\` avec la \`mitigation\` = prochaine action précise, ou \`accepted\` si tu recommandes de l'assumer (en justifiant).
+4. DIALOGUE : si lever ce risque exige une décision ou une information du DEMANDEUR (${risk.raisedBy || "l'agent qui l'a soulevé"}) ou d'un autre profil, NE devine pas — pose une décision/question via le protocole (pending-input ci-dessous), routée vers le bon profil, en référençant ${risk.id}. C'est ainsi que le spécialiste et le demandeur se répondent.
+5. Ne clos jamais un risque sans preuve, et ne masque pas une couche produit manquante en « risque accepté ».
+${contractBlock(pendingFileRel)}${riskRegisterProtocolText(risksFileRel)}`;
+}
+
+/**
+ * Batch risk treatment: one owner agent (the expert) is handed SEVERAL risks of its
+ * domain at once. It mitigates each, then LOOPS BACK to the risk's requester for
+ * validation that the risk is controlled (a decision routed to the requester's profile).
+ */
+export function buildRiskBatchPrompt({ agent, profileLabel, risks, risksFileRel, pendingFileRel, tasksFileRel }) {
+  const list = (risks || [])
+    .map((r) => `- ${r.id} — ${r.title} (sévérité ${r.severity}, soulevé par ${r.raisedBy || "?"})${r.description ? `\n    ${r.description.replace(/\n/g, " ")}` : ""}${r.mitigation ? `\n    Piste : ${r.mitigation}` : ""}`)
+    .join("\n");
+  return `Tu agis comme ${agent} (profil « ${profileLabel || ""} », expert propriétaire), conformément à CLAUDE.md, .claude/rules/ et ton fichier d'agent.
+
+On te confie ${(risks || []).length} RISQUE(S) de ton domaine à TRAITER :
+${list || "- (aucun)"}
+
+Pour CHAQUE risque, dans l'ordre :
+1. Lis tes livrables pertinents (architecture, sécurité, NFR, ADR, tests).
+2. APPLIQUE une mitigation concrète : mets à jour tes livrables (et un ADR sous /livrables/_governance/decisions/ si c'est structurant). Ne te contente pas de re-décrire le risque.
+3. METS À JOUR le risque (protocole registre ci-dessous) : passe-le \`mitigating\` avec la mitigation appliquée.
+4. **BOUCLE DE VALIDATION** : demande au DEMANDEUR du risque (${"celui indiqué dans « soulevé par »"}) de VALIDER que le risque est désormais maîtrisé — pose une DÉCISION via le protocole (pending-input), routée vers le profil du demandeur, du type « Confirmez-vous que ${'<R-XXX>'} est maîtrisé par la mitigation appliquée ? » avec les preuves. **Ne passe PAS le risque \`resolved\` toi-même** : il reste \`mitigating\` tant que le demandeur n'a pas validé.
+5. Si une tâche de suivi pour un autre profil en découle, enregistre-la (protocole tâches ci-dessous).
+
+${contractBlock(pendingFileRel)}${riskRegisterProtocolText(risksFileRel)}${taskProtocolText(tasksFileRel)}`;
+}
+
+/**
+ * Integrate answered decisions: hand the RAISING agent the human answers so it applies
+ * them to the deliverables/code. Works even when the original raising run is gone (the
+ * answers are passed inline), unlike a plain resume.
+ */
+export function buildDecisionIntegrationPrompt({ agent, decisions, pendingFileRel, risksFileRel, tasksFileRel }) {
+  const list = (decisions || [])
+    .map((d) => {
+      const ans = d.answer || {};
+      const a = ans.delegated ? "DÉLÉGUÉ — fais au mieux selon le contexte et les bonnes pratiques" : (ans.choiceLabel || "—");
+      return `- ${d.id} — ${d.title}\n    CONTEXTE : ${(d.context || d.summary || "—").replace(/\n/g, " ")}\n    RÉPONSE HUMAINE : ${a}${ans.note ? ` (note : ${String(ans.note).replace(/\n/g, " ")})` : ""}`;
+    })
+    .join("\n");
+  return `Tu agis comme ${agent} (l'agent qui avait soulevé ces décisions), conformément à CLAUDE.md, .claude/rules/ et ton fichier d'agent.
+
+${(decisions || []).length} DÉCISION(S) que tu avais soulevée(s) ont reçu une RÉPONSE HUMAINE. PRENDS-LES EN COMPTE et METS À JOUR les livrables (et le code si tu es développeur) en conséquence :
+${list || "- (aucune)"}
+
+Pour chaque décision : applique la réponse concrètement (mets à jour le livrable/code concerné, ajoute/actualise un ADR si structurant), en respectant la Definition of Done. Si une réponse est « DÉLÉGUÉ », tranche toi-même au mieux et documente ton choix. Ne repose pas une question déjà répondue. Si l'application révèle une nouvelle imprécision, pose-la via le protocole.
+
+${contractBlock(pendingFileRel)}${riskRegisterProtocolText(risksFileRel)}${taskProtocolText(tasksFileRel)}`;
+}
+
+/**
+ * One-off seeding pass: an agent reads the gate reports, the verification report,
+ * and the journals, extracts every named risk (R-XXX) and writes them as a structured
+ * array to agent-io/risks.json so the platform can ingest them into the register.
+ */
+export function buildRiskSeedPrompt() {
+  return `Tu agis comme @qa pour AMORCER le registre des risques du projet : recenser les risques DÉJÀ identifiés dans les livrables et les rendre traçables.
+
+Travail :
+1. Lis les rapports de gate dans \`livrables/_governance/gates/*.md\` (cherche les statuts \`PASS_WITH_RISK\` / \`FAIL\` et leurs sections « Accepted Risks » / « Blocking Issues »).
+2. Lis le rapport de vérification \`livrables/07-tests/G6-*.md\` et les journaux \`livrables/00-contexte/journaux/*.md\`.
+3. Repère TOUTE référence de risque nommée (motif \`R-...\`, ex. R-G5-05, R-ACC-03) avec son intitulé, sa sévérité implicite, la phase/gate d'origine, son propriétaire et son état réel (un risque décrit comme « LEVÉ / RÉSOLU » → \`resolved\` ; un risque résiduel encore ouvert → \`open\`).
+4. N'INVENTE aucun risque : uniquement ceux réellement écrits dans les livrables. Ne duplique pas un id.
+
+Puis ÉCRIS le résultat dans \`livrables/_governance/agent-io/risks.json\` (crée le dossier si besoin) — un tableau JSON, chaque élément :
+{
+  "id": "R-... (id exact tel qu'écrit dans les livrables)",
+  "title": "intitulé court",
+  "description": "description + impact, tirés du livrable",
+  "severity": "low | medium | high | critical",
+  "phaseId": "G0..G7", "gate": "ex. G6",
+  "owner": "@profil (tel qu'indiqué comme owner)",
+  "status": "open | mitigating | resolved | accepted | closed",
+  "mitigation": "prochaine action indiquée, si présente"
+}
+N'écris QUE ce fichier JSON. Ne modifie aucun livrable.`;
 }

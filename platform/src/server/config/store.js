@@ -6,6 +6,13 @@ const DEFAULT_CONFIG = {
   // Advanced: how the platform invokes Claude Code. Hidden from non-technical users.
   claudeCommand: "claude",
   claudeArgs: ["-p", "{prompt}"],
+  // Permission mode for the headless agent runs. Runs are non-interactive (`claude -p`),
+  // so they CANNOT answer a permission prompt: any tool needing approval would hang/stall.
+  // "bypassPermissions" lets agents execute commands (az, npm, deploy…) without prompting;
+  // human validation happens through this platform's own protocol (decisions / pending-input),
+  // not through the CLI's tool prompts. "acceptEdits" only auto-approves file edits (shell
+  // commands still block — use only if you deliberately want agents unable to run commands).
+  permissionMode: "bypassPermissions",
   // How to launch the DELIVERED product (the app the chain builds) locally.
   app: {
     backend: { command: "", cwd: "" },
@@ -16,6 +23,26 @@ const DEFAULT_CONFIG = {
     // mode "ask": the agent must request approval before a non-approved library.
     // mode "allow-all": the agent may use any library.
     libraries: { mode: "ask", allowed: [] }
+  },
+  // Autopilot ("gestion automatique") : the orchestrator drives the chain by itself —
+  // it plans the next bounded batch, launches the agents, and delegates each decision to
+  // the domain expert agent, only pausing to ask the human when the expert is itself blocked.
+  autopilot: {
+    enabled: false,
+    // How many agent runs may execute at once before a new planning turn is held back.
+    maxConcurrent: 1,
+    // Hard stop after this many orchestration turns (guards against loops).
+    maxIterations: 30,
+    // Hard stop once the session spends this much (USD). 0 = no cost cap.
+    budgetUsd: 10,
+    // When to STOP and ask the human instead of delegating to the expert agent:
+    //  "expert-blocked" — delegate everything; escalate only if the expert can't decide.
+    //  "structural"     — delegate routine choices; escalate structural/irreversible ones.
+    //  "always-delegate"— never escalate mid-run (the expert always decides).
+    escalation: "expert-blocked",
+    // External, hard-to-reverse actions (git push, GitHub publish, launching the built
+    // product) are NEVER run autonomously — they always stay on manual confirmation.
+    externalActionsNeedConfirm: true
   },
   // USD price per MILLION tokens, per model. Used to compute cost from tokens
   // when Claude doesn't report total_cost_usd (e.g. subscription billing).

@@ -49,11 +49,16 @@ export function extractTitle(content) {
 /** Parse a `**Status**: VALUE` line, normalized. */
 export function extractStatus(content) {
   if (!content) return null;
-  const match = content.match(/\*\*Status\*\*\s*:\s*([A-Za-z_ ]+)/i);
-  if (!match) return null;
-  const raw = match[1].trim().toUpperCase().replace(/\s+/g, "_");
-  if (raw.includes("PASS_WITH_RISK")) return "PASS_WITH_RISK";
-  if (raw.includes("PASS")) return "PASS";
-  if (raw.includes("FAIL")) return "FAIL";
-  return raw || null;
+  // Grab everything after "**Status**:" on that line — the value may be wrapped in
+  // markdown emphasis (**FAIL**), backticks, or trailed by a parenthetical note.
+  const line = content.match(/\*\*Status\*\*\s*:\s*(.+)/i);
+  if (!line) return null;
+  // Strip emphasis markers, then keep only the head before any note delimiter.
+  const cleaned = line[1].replace(/[*_`~]/g, " ");
+  const head = cleaned.split(/[(\-—,;:]/)[0].toUpperCase();
+  if (/PASS[_\s]*WITH[_\s]*RISK/.test(head)) return "PASS_WITH_RISK";
+  if (/\bFAIL\b/.test(head)) return "FAIL";
+  if (/\bPASS\b/.test(head)) return "PASS";
+  const tok = head.trim().split(/\s+/)[0].replace(/[^A-Z_]/g, "");
+  return tok || null;
 }

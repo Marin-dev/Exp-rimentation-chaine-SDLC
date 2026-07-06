@@ -13,6 +13,7 @@ body { background: #f6f6fa; }
 /* Rendered markdown for deliverables (no typography plugin, EY palette). */
 .md { color: #2e2e38; font-size: 14px; line-height: 1.6; }
 .md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
 .md h1 { font-size: 22px; font-weight: 700; margin: 0 0 14px; letter-spacing: -0.01em; }
 .md h2 {
   font-size: 17px; font-weight: 700; margin: 26px 0 10px;
@@ -40,6 +41,16 @@ body { background: #f6f6fa; }
 }
 .md a { color: #155eef; text-decoration: underline; }
 .md hr { border: none; border-top: 1px solid #d7d7dc; margin: 18px 0; }
+
+/* Compact markdown for chat bubbles: tighter spacing, scrollable wide tables. */
+.md-compact { font-size: 13px; line-height: 1.5; }
+.md-compact h1 { font-size: 16px; margin: 0 0 8px; }
+.md-compact h2 { font-size: 14.5px; margin: 14px 0 6px; padding-bottom: 3px; }
+.md-compact h3 { font-size: 13.5px; margin: 12px 0 5px; }
+.md-compact p, .md-compact ul, .md-compact ol, .md-compact pre, .md-compact blockquote { margin: 0 0 8px; }
+.md-compact pre { padding: 10px 12px; }
+.md-compact table { display: block; width: max-content; max-width: 100%; overflow-x: auto; }
+.md-compact th, .md-compact td { padding: 5px 8px; }
 
 /* Sidebar nav items (dark EY background) */
 .ey-nav-item {

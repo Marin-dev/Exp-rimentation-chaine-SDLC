@@ -1,8 +1,11 @@
 import React, { useRef, useState } from "react";
-import { X, FileText, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, Paperclip, Trash2, Loader2, Sparkles, RotateCcw } from "lucide-react";
+import { X, FileText, ChevronDown, ChevronRight, CheckCircle2, CheckCheck, Hourglass, AlertTriangle, Paperclip, Trash2, Loader2, Sparkles, RotateCcw, Bot } from "lucide-react";
 import { Api } from "../api.js";
 import { Avatar, useEscToClose } from "./ui.jsx";
 import MarkdownView from "./MarkdownView.jsx";
+
+// Sentinel option id meaning "the user typed their own answer instead of picking an option".
+const CUSTOM_OPTION = "__custom__";
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -46,8 +49,10 @@ function EvidenceItem({ path }) {
   );
 }
 
-export default function DecisionDetailModal({ decision, profiles, currentProfile, onClose, onAnswered, onStateChange }) {
+export default function DecisionDetailModal({ decision, profiles, currentProfile, onClose, onAnswered, onStateChange, onResume }) {
   const answered = decision.status === "answered";
+  const applied = decision.status === "applied";
+  const decided = answered || applied;
   const [optionId, setOptionId] = useState(null);
   const [freeChoice, setFreeChoice] = useState("");
   const [note, setNote] = useState("");
@@ -55,14 +60,19 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [viaAgent, setViaAgent] = useState(false);
+  const [launched, setLaunched] = useState(null);
   const fileRef = useRef(null);
+  const targetLabel = decision.targetProfileLabel || decision.targetProfile;
 
   useEscToClose(onClose);
 
   const me = profiles.find((p) => p.id === currentProfile);
   const hasOptions = decision.options && decision.options.length > 0;
+  // Even when options exist, the user can pick "Autre" to write a custom answer.
+  const usingCustom = !hasOptions || optionId === CUSTOM_OPTION;
   const canSubmit =
-    (hasOptions ? Boolean(optionId) : Boolean(freeChoice.trim())) || files.length > 0;
+    (usingCustom ? Boolean(freeChoice.trim()) : Boolean(optionId)) || files.length > 0;
 
   async function onPickFiles(e) {
     const picked = Array.from(e.target.files || []);
@@ -83,6 +93,19 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
     }
   }
 
+  async function integrate() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await Api.integrateDecisions([decision.id]);
+      onStateChange(res.state);
+      onClose();
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+
   async function reopen() {
     setBusy(true);
     setError(null);
@@ -98,14 +121,39 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
     }
   }
 
+  // Resolve the item via the TARGET profile's agent (agent-to-agent).
+  // mode "delegate": that agent answers from scratch; "validate": it reviews my answer.
+  async function resolveVia(mode) {
+    setBusy(true);
+    setError(null);
+    try {
+      const humanAnswer = usingCustom
+        ? freeChoice.trim()
+        : (decision.options.find((o) => o.id === optionId)?.label || "");
+      const res = await Api.resolveViaAgent({
+        id: decision.id,
+        mode,
+        humanAnswer: mode === "validate" ? humanAnswer : undefined,
+        note: note.trim()
+      });
+      setLaunched({ agent: res.targetAgent || `@${targetLabel}`, mode });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit() {
+    // Route my answer THROUGH the target agent for validation when requested.
+    if (viaAgent) return resolveVia("validate");
     setBusy(true);
     setError(null);
     try {
       const res = await Api.answerDecision({
         id: decision.id,
-        optionId: hasOptions ? optionId : null,
-        choiceLabel: hasOptions ? null : freeChoice.trim(),
+        optionId: usingCustom ? null : optionId,
+        choiceLabel: usingCustom ? freeChoice.trim() : null,
         note: note.trim(),
         documents: files.map((f) => f.path),
         decidedBy: currentProfile
@@ -199,7 +247,7 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
           ) : null}
 
           {/* Answered state */}
-          {answered ? (
+          {decided ? (
             decision.answer.delegated ? (
               <div className="rounded-md border border-ey-border bg-base-200 p-4">
                 <div className="flex items-center gap-2 text-ey-black font-semibold mb-1">
@@ -246,8 +294,40 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
                 Par {profiles.find((p) => p.id === decision.answer.decidedBy)?.label || decision.answer.decidedBy} ·{" "}
                 {new Date(decision.answer.decidedAt).toLocaleString("fr-FR")}
               </p>
+              {applied ? (
+                <div className="mt-2 pt-2 border-t border-[#cdebd9] flex items-center gap-1.5 text-[12.5px] font-semibold text-[#168736]">
+                  <CheckCheck size={15} /> Prise en compte par l'agent demandeur
+                  {decision.appliedAt ? <span className="font-normal text-ey-gray01">· {new Date(decision.appliedAt).toLocaleString("fr-FR")}</span> : null}
+                </div>
+              ) : (
+                <div className="mt-2 pt-2 border-t border-[#cdebd9] flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-1.5 text-[12.5px] text-[#A15C07]">
+                    <Hourglass size={14} /> Répondu — à intégrer par l'agent demandeur.
+                  </span>
+                  <button
+                    className="btn btn-primary btn-sm gap-1.5 shrink-0"
+                    onClick={integrate}
+                    disabled={busy}
+                  >
+                    <RotateCcw size={14} /> Intégrer (prise en compte)
+                  </button>
+                </div>
+              )}
             </div>
             )
+          ) : launched ? (
+            <div className="rounded-md border border-ey-border bg-base-200 p-4">
+              <div className="flex items-center gap-2 text-ey-black font-semibold mb-1">
+                <Bot size={17} className="text-accent" /> {launched.agent} a été lancé
+              </div>
+              <p className="m-0 text-[13px] text-ey-gray01">
+                {launched.mode === "validate"
+                  ? `${targetLabel} relit ta réponse à la lumière de ses livrables, l'ajuste si besoin, puis la transmet au demandeur.`
+                  : `${targetLabel} tranche la question à partir de ses livrables, met à jour sa doc si nécessaire, puis transmet sa réponse au demandeur.`}
+                {" "}La décision se mettra à jour ici quand il aura répondu.
+              </p>
+              <button className="btn btn-primary btn-sm mt-3" onClick={onClose}>Fermer</button>
+            </div>
           ) : (
             /* Decision form */
             <div className="border-t border-ey-border pt-4">
@@ -283,10 +363,40 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
                       </span>
                     </label>
                   ))}
+                  <label
+                    className={`flex items-start gap-3 border rounded-md p-3 cursor-pointer ${
+                      optionId === CUSTOM_OPTION ? "border-ey-yellow bg-[#fffdf0]" : "border-ey-border"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="opt"
+                      className="radio radio-sm mt-0.5"
+                      checked={optionId === CUSTOM_OPTION}
+                      onChange={() => setOptionId(CUSTOM_OPTION)}
+                    />
+                    <span>
+                      <b className="text-[13.5px]">Autre — répondre moi-même</b>
+                      <span className="block text-[12.5px] text-ey-gray01">
+                        Aucune option ne convient : saisir une réponse personnalisée.
+                      </span>
+                    </span>
+                  </label>
+                  {optionId === CUSTOM_OPTION ? (
+                    <textarea
+                      className="textarea textarea-bordered w-full"
+                      rows={4}
+                      placeholder="Votre réponse…"
+                      value={freeChoice}
+                      onChange={(e) => setFreeChoice(e.target.value)}
+                      autoFocus
+                    />
+                  ) : null}
                 </div>
               ) : (
-                <input
-                  className="input input-bordered w-full mb-3"
+                <textarea
+                  className="textarea textarea-bordered w-full mb-3"
+                  rows={4}
                   placeholder="Votre choix / arbitrage"
                   value={freeChoice}
                   onChange={(e) => setFreeChoice(e.target.value)}
@@ -342,14 +452,39 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
                 </div>
               ) : null}
 
-              <div className="flex items-center justify-between">
+              <label className="flex items-start gap-2 text-[12.5px] mb-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm mt-0.5"
+                  checked={viaAgent}
+                  onChange={(e) => setViaAgent(e.target.checked)}
+                />
+                <span>
+                  Faire <b>valider ma réponse par {targetLabel}</b> avant de la transmettre au demandeur
+                  <span className="block text-[11.5px] text-ey-gray01">
+                    Son agent relit à la lumière de ses livrables, corrige/enrichit si besoin, puis répond au demandeur.
+                  </span>
+                </span>
+              </label>
+
+              <div className="flex items-center justify-between gap-3">
                 <span className="text-[12px] text-ey-gray01 flex items-center gap-1.5">
                   {me ? <Avatar profile={me} size={20} /> : null}
-                  Vous décidez en tant que <b className="text-ey-black">{me?.label}</b>
+                  en tant que <b className="text-ey-black">{me?.label}</b>
                 </span>
-                <button className="btn btn-primary btn-sm" onClick={submit} disabled={!canSubmit || busy}>
-                  {busy ? "Enregistrement…" : "Valider la décision"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-outline btn-sm gap-1.5"
+                    onClick={() => resolveVia("delegate")}
+                    disabled={busy}
+                    title={`Laisser ${targetLabel} trancher à partir de ses livrables`}
+                  >
+                    <Bot size={15} /> Confier à {targetLabel}
+                  </button>
+                  <button className="btn btn-primary btn-sm" onClick={submit} disabled={!canSubmit || busy}>
+                    {busy ? "…" : viaAgent ? `Valider via ${targetLabel}` : "Valider la décision"}
+                  </button>
+                </div>
               </div>
             </div>
           )}

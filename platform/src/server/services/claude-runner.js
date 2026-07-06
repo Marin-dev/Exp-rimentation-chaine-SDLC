@@ -9,13 +9,15 @@ import { spawn } from "node:child_process";
 export function runClaudePrint(config, prompt, { timeoutMs = 150000, cwd } = {}) {
   return new Promise((resolve) => {
     const command = config.claudeCommand || "claude";
+    const permissionMode = config.permissionMode || "bypassPermissions";
     let child;
     try {
-      // shell:true lets Windows resolve `claude.cmd`; argv is constant ("-p").
+      // shell:true lets Windows resolve `claude.cmd`; argv is a constant flag set.
+      // Print mode can't answer prompts, so bypass permissions (config-overridable).
       // windowsHide avoids allocating a console/conhost per spawn, which under
       // repeated launches exhausts the desktop heap and makes new processes fail
       // to init (Windows STATUS_DLL_INIT_FAILED, exit code 0xC0000142).
-      child = spawn(command, ["-p"], { cwd, shell: true, windowsHide: true });
+      child = spawn(command, ["-p", "--permission-mode", permissionMode], { cwd, shell: true, windowsHide: true });
     } catch (e) {
       resolve({ ok: false, error: `Impossible de lancer Claude: ${e.message}` });
       return;

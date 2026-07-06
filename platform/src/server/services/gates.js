@@ -3,14 +3,16 @@ import { listDirSafe, readTextSafe, statSafe, extractStatus } from "./fs-utils.j
 
 /**
  * Read gate reports from /livrables/_governance/gates/.
- * Returns a map keyed by gate id (G0..G7) with the parsed status.
- * A missing gate file means the phase has not been validated yet.
+ * Returns a map keyed by gate id (G0..G7, plus lettered variants like G6R) with the
+ * parsed status. A missing gate file means the phase has not been validated yet.
  */
 export function readGates(paths) {
   const result = {};
   for (const entry of listDirSafe(paths.gatesDir)) {
     if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
-    const idMatch = entry.name.match(/^(G\d)/i);
+    // Digit, then an OPTIONAL suffix letter (e.g. "G6R"), so a lettered gate does not
+    // collapse onto its base gate ("G6R-…" must not be read as "G6").
+    const idMatch = entry.name.match(/^(G\d[A-Za-z]?)/i);
     if (!idMatch) continue;
     const id = idMatch[1].toUpperCase();
     const full = path.join(paths.gatesDir, entry.name);

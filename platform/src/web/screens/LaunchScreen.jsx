@@ -4,6 +4,7 @@ import { Api } from "../api.js";
 import { Card, EmptyState, GateBadge } from "../components/ui.jsx";
 import RunConsole from "../components/RunConsole.jsx";
 import RunNextSteps from "../components/RunNextSteps.jsx";
+import FolderInput from "../components/FolderInput.jsx";
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -131,14 +132,10 @@ export default function LaunchScreen({ state, activeRun, onRunStarted, onStartNe
             <p className="text-ey-gray01 text-[13px] mt-0 mb-3">
               Chemin du dossier contenant les documents du projet (besoins, parcours, specs, CR…).
             </p>
-            <div className="flex gap-2">
-              <input
-                className="input input-bordered flex-1"
-                placeholder="C:\chemin\vers\le\dossier-intake"
-                value={intakePath}
-                onChange={(e) => setIntakePath(e.target.value)}
-                spellCheck={false}
-              />
+            <div className="flex gap-2 items-start">
+              <div className="flex-1">
+                <FolderInput value={intakePath} onChange={setIntakePath} placeholder="C:\chemin\vers\le\dossier-intake" />
+              </div>
               <button
                 className="btn btn-outline gap-1.5"
                 onClick={doScan}

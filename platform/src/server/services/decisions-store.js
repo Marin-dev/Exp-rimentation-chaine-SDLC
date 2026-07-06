@@ -136,6 +136,17 @@ export function createItems(paths, rawItems, meta = {}) {
   return { ok: true, ids };
 }
 
+/** Read a single decision/question by id (source of truth = project-state.json). */
+export function getDecision(paths, id) {
+  const data = load(paths);
+  return data.decisions.find((d) => d.id === String(id || "").trim()) || null;
+}
+
+/** Read the full list of decisions/questions (source of truth = project-state.json). */
+export function listDecisions(paths) {
+  return load(paths).decisions;
+}
+
 export function answerDecision(paths, input) {
   const id = String(input.id || "").trim();
   const data = load(paths);
@@ -197,14 +208,58 @@ export function answerDecision(paths, input) {
   };
 }
 
+/**
+ * Mark every answered decision raised by `runId` as APPLIED — i.e. the raising agent
+ * has re-run and integrated the human answer into the deliverables. Called when a
+ * resume run completes successfully, so the human can SEE their answer was taken into account.
+ */
+export function markDecisionsApplied(paths, runId) {
+  const id = String(runId || "").trim();
+  if (!id) return { applied: 0 };
+  const data = load(paths);
+  let applied = 0;
+  const now = new Date().toISOString();
+  for (const d of data.decisions) {
+    if (d.runId === id && d.status === "answered") {
+      d.status = "applied";
+      d.appliedAt = now;
+      applied += 1;
+    }
+  }
+  if (applied) save(paths, data);
+  return { applied };
+}
+
+/** Mark specific answered decisions (by id) as applied — used after an integration run. */
+export function markDecisionsAppliedByIds(paths, ids) {
+  const set = new Set((ids || []).map((x) => String(x)));
+  if (!set.size) return { applied: 0 };
+  const data = load(paths);
+  let applied = 0;
+  const now = new Date().toISOString();
+  for (const d of data.decisions) {
+    if (set.has(d.id) && d.status === "answered") {
+      d.status = "applied";
+      d.appliedAt = now;
+      applied += 1;
+    }
+  }
+  if (applied) save(paths, data);
+  return { applied };
+}
+
 /** Reopen an answered item (e.g. to correct the AI's delegated decision). */
-export function reopenDecision(paths, id) {
+export function reopenDecision(paths, id, reason) {
   const data = load(paths);
   const decision = data.decisions.find((d) => d.id === String(id).trim());
   if (!decision) return { ok: false, error: "Décision introuvable." };
   decision.status = "pending";
   decision.priorAnswer = decision.answer; // keep for context
   decision.answer = null;
+  // A control audit can reopen with a reason so the target profile sees WHY
+  // its prior answer was returned (incohérence / non documentée).
+  const why = String(reason || "").trim();
+  decision.reopenReason = why || null;
   save(paths, data);
   return { ok: true, id: decision.id };
 }
@@ -227,33 +282,6 @@ export function applyResolutions(paths, resolutions) {
   }
   if (applied) save(paths, data);
   return { applied };
-}
-
-/**
- * Bulk "do your best" — delegate a set of items to the AI in one go.
- * Each item is marked answered with a delegated response; the AI will decide
- * and document its choice on the next run. Returns the runs now fully answered.
- */
-export function answerItemsAuto(paths, { ids, decidedBy }) {
-  const list = Array.isArray(ids) ? ids : [];
-  if (!list.length) return { ok: false, error: "Aucun élément sélectionné." };
-  let count = 0;
-  for (const id of list) {
-    const r = answerDecision(paths, { id, delegate: true, decidedBy });
-    if (r.ok) count += 1;
-  }
-  // Which runs are now fully answered (resumable)?
-  const data = load(paths);
-  const answeredItems = data.decisions.filter((d) => list.includes(d.id));
-  const runIds = [...new Set(answeredItems.map((d) => d.runId).filter(Boolean))];
-  const resumableRuns = [];
-  for (const runId of runIds) {
-    const its = data.decisions.filter((d) => d.runId === runId);
-    if (its.length > 0 && its.every((d) => d.status === "answered")) {
-      resumableRuns.push({ runId, phaseId: its[0].phaseId || null });
-    }
-  }
-  return { ok: true, count, resumableRuns };
 }
 
 /** Accumulate human answers for a run so a follow-up AI run can read them. */

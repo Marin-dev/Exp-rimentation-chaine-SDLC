@@ -2,8 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { Send, Loader2, MessageCircle, Bot } from "lucide-react";
 import { Api } from "../api.js";
 import { Avatar } from "./ui.jsx";
+import MarkdownView from "./MarkdownView.jsx";
+import { loadThread, saveThread } from "../chatStore.js";
 
-export default function ChatPanel({ phaseId, agentLabel, profile, profileObj, onRunDone, seed }) {
+export default function ChatPanel({ phaseId, agentLabel, profile, profileObj, onRunDone, seed, threadKey }) {
+  const key = threadKey || `phase:${phaseId}`;
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -13,8 +16,19 @@ export default function ChatPanel({ phaseId, agentLabel, profile, profileObj, on
   const scrollRef = useRef(null);
   const lastSeed = useRef(null);
   const streamingRef = useRef(false);
+  const loadedRef = useRef(false);
 
   useEffect(() => () => esRef.current && esRef.current.close(), []);
+
+  // Restore the saved thread for this phase on mount; persist it on every change.
+  useEffect(() => {
+    setMessages(loadThread(key));
+    loadedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  useEffect(() => {
+    if (loadedRef.current) saveThread(key, messages);
+  }, [messages, key]);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, streamText]);
@@ -108,8 +122,8 @@ export default function ChatPanel({ phaseId, agentLabel, profile, profileObj, on
               <span className="w-[26px] h-[26px] rounded-full bg-ey-yellow grid place-items-center shrink-0">
                 <Bot size={15} className="text-ey-black" />
               </span>
-              <div className="bg-base-200 border border-ey-border rounded-lg rounded-tl-none px-3 py-2 text-[13px] max-w-[85%] whitespace-pre-wrap">
-                {m.text}
+              <div className="bg-base-200 border border-ey-border rounded-lg rounded-tl-none px-3 py-2 text-[13px] max-w-[85%] overflow-x-auto">
+                <MarkdownView content={m.text} className="md-compact" />
               </div>
             </div>
           )

@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Play, Square, Server, Monitor, ExternalLink, Settings2, Save, Loader2 } from "lucide-react";
+import { Play, Square, Server, Monitor, ExternalLink, Settings2, Save, Loader2, Wand2 } from "lucide-react";
 import { Api } from "../api.js";
 import { Card } from "../components/ui.jsx";
+import FolderInput from "../components/FolderInput.jsx";
+import RunConsole from "../components/RunConsole.jsx";
 
 function StatusDot({ status }) {
   const map = {
@@ -53,6 +55,10 @@ export default function LaunchAppScreen() {
   const [showConfig, setShowConfig] = useState(false);
   const [draft, setDraft] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [detectAgent, setDetectAgent] = useState("@devops");
+  const [detectRunId, setDetectRunId] = useState(null);
+  const [detecting, setDetecting] = useState(false);
+  const resyncDraft = useRef(false);
   const timer = useRef(null);
 
   function refresh() {
@@ -60,7 +66,12 @@ export default function LaunchAppScreen() {
       .then((r) => {
         setApp(r.app);
         setStatus(r.status);
-        if (!draft) setDraft(r.app);
+        // Adopt the config into the draft on first load, or after an agent detection
+        // has just rewritten it (so the config form reflects the detected values).
+        if (!draft || resyncDraft.current) {
+          setDraft(r.app);
+          resyncDraft.current = false;
+        }
       })
       .catch(() => {});
   }
@@ -71,9 +82,17 @@ export default function LaunchAppScreen() {
     return () => clearInterval(timer.current);
   }, []);
 
-  const configured = Boolean(app?.backend?.command || app?.frontend?.command);
-  const frontUrl = app?.frontend?.url;
+  const hasBackend = Boolean(app?.backend?.command?.trim());
+  const hasFrontend = Boolean(app?.frontend?.command?.trim());
+  const configured = hasBackend || hasFrontend;
+  // Whichever running service exposes a URL is the one to open (a single Node app that
+  // serves its own UI works just as well as a separate front-end).
   const frontRunning = status?.frontend?.status === "running";
+  const backendRunning = status?.backend?.status === "running";
+  const openUrl =
+    (frontRunning && app?.frontend?.url?.trim()) ||
+    (backendRunning && app?.backend?.url?.trim()) ||
+    "";
 
   async function start(which) {
     setBusy(true);
@@ -110,6 +129,23 @@ export default function LaunchAppScreen() {
     setDraft((d) => ({ ...d, [group]: { ...d[group], [key]: value } }));
   }
 
+  async function detect() {
+    setDetecting(true);
+    try {
+      const r = await Api.appDetect(detectAgent);
+      setDetectRunId(r.runId);
+      setShowConfig(true);
+    } catch {
+      setDetecting(false);
+    }
+  }
+
+  function onDetectDone() {
+    setDetecting(false);
+    resyncDraft.current = true; // next status poll adopts the agent-written config
+    refresh();
+  }
+
   return (
     <>
       <div className="flex items-start justify-between gap-4">
@@ -120,8 +156,8 @@ export default function LaunchAppScreen() {
           </p>
         </div>
         <div className="flex gap-2">
-          {frontRunning && frontUrl ? (
-            <a className="btn btn-outline btn-sm gap-1.5" href={frontUrl} target="_blank" rel="noreferrer">
+          {openUrl ? (
+            <a className="btn btn-outline btn-sm gap-1.5" href={openUrl} target="_blank" rel="noreferrer">
               <ExternalLink size={15} /> Ouvrir l'application
             </a>
           ) : null}
@@ -151,10 +187,47 @@ export default function LaunchAppScreen() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
-          <ProcCard icon={Server} title="Back-end" name="backend" proc={status.backend} onStart={start} onStop={stop} busy={busy} />
-          <ProcCard icon={Monitor} title="Front-end" name="frontend" proc={status.frontend} onStart={start} onStop={stop} busy={busy} />
+          {hasBackend ? (
+            <ProcCard icon={Server} title="Back-end" name="backend" proc={status.backend} onStart={start} onStop={stop} busy={busy} />
+          ) : null}
+          {hasFrontend ? (
+            <ProcCard icon={Monitor} title="Front-end" name="frontend" proc={status.frontend} onStart={start} onStop={stop} busy={busy} />
+          ) : null}
         </div>
       )}
+
+      {/* Auto-détection des paramètres de lancement par un agent technique */}
+      <Card className="p-5 mt-5">
+        <div className="flex items-center gap-2 mb-1">
+          <Wand2 size={17} className="text-ey-gray01" />
+          <b>Compléter automatiquement</b>
+        </div>
+        <p className="text-ey-gray01 text-[13px] mt-0 mb-3">
+          Demandez à un agent technique d'inspecter le produit développé et de renseigner
+          les commandes de démarrage (back-end, front-end, URL) à votre place.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-[12px] font-semibold">Agent</label>
+          <select
+            className="select select-bordered select-sm"
+            value={detectAgent}
+            onChange={(e) => setDetectAgent(e.target.value)}
+            disabled={detecting}
+          >
+            <option value="@devops">@devops</option>
+            <option value="@developpeur">@developpeur</option>
+          </select>
+          <button className="btn btn-primary btn-sm gap-1.5" onClick={detect} disabled={detecting}>
+            {detecting ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />}
+            Détecter les paramètres
+          </button>
+        </div>
+        {detectRunId ? (
+          <div className="mt-4">
+            <RunConsole runId={detectRunId} label={`Détection · ${detectAgent}`} onDone={onDetectDone} />
+          </div>
+        ) : null}
+      </Card>
 
       {/* Config */}
       <button
@@ -175,8 +248,12 @@ export default function LaunchAppScreen() {
               <input className="input input-bordered input-sm w-full mb-2" placeholder="ex. npm start"
                 value={draft.backend?.command || ""} onChange={(e) => field("backend", "command", e.target.value)} spellCheck={false} />
               <label className="block text-[12px] font-semibold mb-1">Dossier de travail</label>
-              <input className="input input-bordered input-sm w-full" placeholder="ex. C:\\...\\api"
-                value={draft.backend?.cwd || ""} onChange={(e) => field("backend", "cwd", e.target.value)} spellCheck={false} />
+              <div className="mb-2">
+                <FolderInput size="sm" value={draft.backend?.cwd || ""} onChange={(v) => field("backend", "cwd", v)} placeholder="ex. C:\...\api" />
+              </div>
+              <label className="block text-[12px] font-semibold mb-1">URL d'ouverture <span className="font-normal text-ey-gray01">(si le back-end sert aussi l'UI)</span></label>
+              <input className="input input-bordered input-sm w-full" placeholder="ex. http://localhost:3000"
+                value={draft.backend?.url || ""} onChange={(e) => field("backend", "url", e.target.value)} spellCheck={false} />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-2 font-semibold text-[13.5px]">
@@ -186,8 +263,9 @@ export default function LaunchAppScreen() {
               <input className="input input-bordered input-sm w-full mb-2" placeholder="ex. npm run dev"
                 value={draft.frontend?.command || ""} onChange={(e) => field("frontend", "command", e.target.value)} spellCheck={false} />
               <label className="block text-[12px] font-semibold mb-1">Dossier de travail</label>
-              <input className="input input-bordered input-sm w-full mb-2" placeholder="ex. C:\\...\\web"
-                value={draft.frontend?.cwd || ""} onChange={(e) => field("frontend", "cwd", e.target.value)} spellCheck={false} />
+              <div className="mb-2">
+                <FolderInput size="sm" value={draft.frontend?.cwd || ""} onChange={(v) => field("frontend", "cwd", v)} placeholder="ex. C:\...\web" />
+              </div>
               <label className="block text-[12px] font-semibold mb-1">URL d'ouverture</label>
               <input className="input input-bordered input-sm w-full" placeholder="ex. http://localhost:3000"
                 value={draft.frontend?.url || ""} onChange={(e) => field("frontend", "url", e.target.value)} spellCheck={false} />
