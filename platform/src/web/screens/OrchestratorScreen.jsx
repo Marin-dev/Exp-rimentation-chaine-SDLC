@@ -6,21 +6,23 @@ import RunConsole from "../components/RunConsole.jsx";
 import { loadThread, saveThread, clearThread } from "../chatStore.js";
 
 const STOP_LABELS = {
-  manual: "Arrêt manuel",
+  manual: "Arrêté",
+  done: "Demande accomplie",
   budget: "Plafond de dépense atteint",
   iterations: "Nombre de tours maximum atteint",
-  converged: "Chaîne convergée — tous les gates sont passés",
-  stuck: "Blocage — intervention humaine nécessaire"
+  stuck: "Bloqué — précise ou reformule ta demande"
 };
 
 /**
- * Autopilot ("gestion automatique") panel: one checkbox hands the pilot to the orchestrator,
- * which plans, launches agents and delegates decisions to the expert agents on its own. When
- * an expert is blocked, its question surfaces HERE as a card — you answer, it continues.
+ * Copilot ("gestion automatique") panel: you type ONE demand, and the orchestrator carries it
+ * out end to end — planning, launching agents, delegating decisions to the expert agents — then
+ * hands you back a report. When an expert is blocked, its question surfaces HERE as a card:
+ * you answer, it continues. Without a demand it does nothing.
  */
 function AutopilotPanel({ onStateChange }) {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [req, setReq] = useState("");
   const [answers, setAnswers] = useState({}); // { [decisionId]: { choiceLabel, note } }
   const timerRef = useRef(null);
 
@@ -33,17 +35,28 @@ function AutopilotPanel({ onStateChange }) {
     return () => clearInterval(timerRef.current);
   }, []);
 
-  const enabled = status?.enabled;
   const session = status?.session || null;
   const st = session?.status;
+  const active = Boolean(session && (st === "running" || st === "waiting-human"));
   const escalations = session?.escalations || [];
 
-  async function toggle() {
+  async function launch() {
+    const demand = req.trim();
+    if (!demand) return;
     setBusy(true);
     try {
-      const r = enabled ? await Api.autopilotStop() : await Api.autopilotStart();
+      const r = await Api.autopilotStart(demand);
+      setReq("");
       setStatus(r);
-    } catch {}
+    } catch (e) {
+      // surface the error inline via a transient status refresh
+      await refresh();
+    } finally { setBusy(false); }
+  }
+
+  async function stop() {
+    setBusy(true);
+    try { setStatus(await Api.autopilotStop()); } catch {}
     finally { setBusy(false); }
   }
 
@@ -81,10 +94,11 @@ function AutopilotPanel({ onStateChange }) {
   const settings = status?.settings || {};
   const budget = settings.budgetUsd || 0;
   const spent = session?.spentUsd || 0;
+  const showResult = st === "stopped" && (session?.result || session?.stopReason);
 
   return (
     <div className="border border-ey-border rounded-lg bg-base-100 mb-4 overflow-hidden">
-      {/* Header + toggle */}
+      {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-base-200 border-b border-ey-border">
         <span className="w-8 h-8 rounded-lg bg-ey-black grid place-items-center shrink-0">
           <Gauge size={17} className="text-ey-yellow" />
@@ -92,41 +106,97 @@ function AutopilotPanel({ onStateChange }) {
         <div className="flex-1 min-w-0">
           <div className="font-bold text-[14px] leading-tight">Gestion automatique</div>
           <div className="text-[11.5px] text-ey-gray01">
-            L'orchestrateur pilote seul : il planifie, lance les agents et fait trancher les experts. Il ne t'interrompt que si un expert est bloqué.
+            Donne-lui une demande : il s'en occupe de bout en bout (planifie, lance les agents, fait trancher les experts) et te rend le résultat.
           </div>
         </div>
-        <label className="flex items-center gap-2 cursor-pointer shrink-0">
-          <span className={`text-[12px] font-semibold ${enabled ? "text-[#168736]" : "text-ey-gray02"}`}>
-            {enabled ? "Activée" : "Désactivée"}
-          </span>
-          <input type="checkbox" className="toggle toggle-success toggle-sm" checked={Boolean(enabled)} onChange={toggle} disabled={busy} />
-        </label>
+        {active ? (
+          <button className="btn btn-outline btn-error btn-sm gap-1.5 shrink-0" onClick={stop} disabled={busy}>
+            <StopCircle size={15} /> Arrêter
+          </button>
+        ) : null}
       </div>
 
-      {/* Live status */}
-      {enabled || session ? (
-        <div className="px-4 py-3">
-          <div className="flex items-center gap-4 flex-wrap text-[12px]">
-            <span className="flex items-center gap-1.5">
-              {st === "running" ? <Loader2 size={14} className="animate-spin text-secondary" />
-                : st === "waiting-human" ? <HelpCircle size={14} className="text-[#A15C07]" />
-                : <StopCircle size={14} className="text-ey-gray02" />}
-              <b>{st === "running" ? "En pilotage…" : st === "waiting-human" ? "En attente de ta réponse" : "À l'arrêt"}</b>
-            </span>
-            <span className="text-ey-gray01">Tours : <b>{session?.iterations ?? 0}</b>{settings.maxIterations ? ` / ${settings.maxIterations}` : ""}</span>
-            <span className="text-ey-gray01">
-              Dépense : <b>${spent.toFixed(2)}</b>{budget ? ` / $${budget}` : ""}
-            </span>
-          </div>
-
-          {/* Stop reason */}
-          {st === "stopped" && session?.stopReason ? (
-            <div className={`mt-2 flex items-start gap-2 rounded-md px-3 py-2 text-[12.5px] ${session.stopReason === "converged" ? "bg-[#EAF7EE] border border-[#cdebd9]" : "bg-base-200 border border-ey-border"}`}>
-              {session.stopReason === "converged" ? <CheckCircle2 size={15} className="text-[#168736] mt-0.5" /> : <AlertTriangle size={15} className="text-ey-gray01 mt-0.5" />}
-              <span><b>{STOP_LABELS[session.stopReason] || "Arrêté"}.</b> {session.stopMessage || ""}</span>
+      <div className="px-4 py-3">
+        {/* Demande input — shown when nothing is running */}
+        {!active ? (
+          <div className="mb-1">
+            <label className="block text-[12.5px] font-semibold mb-1.5">Que veux-tu que l'orchestrateur fasse ?</label>
+            <textarea
+              className="textarea textarea-bordered w-full text-[13px]"
+              rows={2}
+              placeholder="Ex. « Développe l'écran de connexion à partir des US du backlog » ou « Fais passer la revue G2 »."
+              value={req}
+              onChange={(e) => setReq(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) launch(); }}
+              disabled={busy}
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <button className="btn btn-primary btn-sm gap-1.5" onClick={launch} disabled={busy || !req.trim()}>
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Lancer en automatique
+              </button>
+              <span className="text-[11px] text-ey-gray02">Il te demandera seulement si un expert est bloqué. ⌘/Ctrl + Entrée</span>
             </div>
-          ) : null}
+          </div>
+        ) : null}
 
+        {/* Result / stop report */}
+        {showResult ? (
+          <div className={`mb-3 flex items-start gap-2 rounded-md px-3 py-2 text-[12.5px] ${session.stopReason === "done" ? "bg-[#EAF7EE] border border-[#cdebd9]" : "bg-base-200 border border-ey-border"}`}>
+            {session.stopReason === "done" ? <CheckCircle2 size={15} className="text-[#168736] mt-0.5 shrink-0" /> : <AlertTriangle size={15} className="text-ey-gray01 mt-0.5 shrink-0" />}
+            <div className="min-w-0">
+              <div className="font-bold">{STOP_LABELS[session.stopReason] || "Terminé"}</div>
+              {session.request ? <div className="text-[11.5px] text-ey-gray02 mt-0.5 italic">« {session.request} »</div> : null}
+              <div className="mt-1 whitespace-pre-wrap">{session.result || session.stopMessage || ""}</div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Live status while active */}
+        {active ? (
+          <>
+            {session?.request ? (
+              <div className="mb-2 text-[12.5px]">
+                <span className="text-ey-gray02">Demande :</span> <b>« {session.request} »</b>
+              </div>
+            ) : null}
+            <div className="flex items-center gap-4 flex-wrap text-[12px]">
+              <span className="flex items-center gap-1.5">
+                {st === "running" ? <Loader2 size={14} className="animate-spin text-secondary" /> : <HelpCircle size={14} className="text-[#A15C07]" />}
+                <b>{st === "running" ? "En cours…" : "En attente de ta réponse"}</b>
+              </span>
+              <span className="text-ey-gray01">Tours : <b>{session?.iterations ?? 0}</b>{settings.maxIterations ? ` / ${settings.maxIterations}` : ""}</span>
+              <span className="text-ey-gray01">Dépense : <b>${spent.toFixed(2)}</b>{budget ? ` / $${budget}` : ""}</span>
+            </div>
+
+            {/* Steps launched so far — what it delegated, to whom */}
+            {session?.launched?.length ? (
+              <div className="mt-2.5 flex flex-col gap-1">
+                {session.launched.map((l, i) => (
+                  <div key={i} className="flex items-center gap-2 text-[12px]">
+                    <Bot size={13} className="text-secondary shrink-0" />
+                    <span className="font-semibold">{l.agent || "agent"}</span>
+                    {l.phaseId ? <span className="badge badge-ghost badge-xs">{l.phaseId}</span> : null}
+                    <span className="text-ey-gray01 truncate">{l.label}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {/* Live console of the agent currently working — see exactly what it's doing */}
+            {status?.currentRun ? (
+              <div className="mt-3">
+                <div className="text-[11.5px] text-ey-gray02 mb-1 flex items-center gap-1.5">
+                  <Loader2 size={12} className="animate-spin" />
+                  {status.currentRun.kind === "chat" ? "L'orchestrateur analyse et planifie…" : `${status.currentRun.agent || "L'agent"} travaille en direct :`}
+                </div>
+                <RunConsole runId={status.currentRun.id} label={status.currentRun.label} />
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        {active || escalations.length || session?.activity?.length ? (
+        <div className={active ? "" : "mt-1"}>
           {/* Escalations — the "it asks, you answer, it continues" cards */}
           {escalations.length ? (
             <div className="mt-3 rounded-lg border border-[#f0d8a8] bg-[#FFFBF2] p-3">
@@ -205,7 +275,8 @@ function AutopilotPanel({ onStateChange }) {
             </details>
           ) : null}
         </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

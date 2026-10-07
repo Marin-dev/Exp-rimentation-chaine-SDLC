@@ -23,7 +23,13 @@ const KIND_LABELS = {
   review: "Revue et décision de gate",
   chat: "Échange / consigne",
   resume: "Reprise après réponses",
-  "new-need": "Requalification d'un besoin"
+  "new-need": "Requalification d'un besoin",
+  orchestrated: "Tâche pilotée par l'orchestrateur",
+  remediation: "Correction des risques",
+  resolution: "Résolution d'une décision (expert)",
+  "risk-seed": "Amorçage des risques",
+  "task-batch": "Traitement d'un lot de tâches",
+  "app-detect": "Détection du lancement du produit"
 };
 
 function describe(rec, phaseTitle) {
@@ -43,6 +49,18 @@ function describe(rec, phaseTitle) {
       return `Reprise du travail sur « ${phaseTitle} » après les réponses humaines.`;
     case "new-need":
       return "Requalification d'un nouveau besoin métier dans la chaîne.";
+    case "orchestrated":
+      return `Tâche confiée par l'orchestrateur à ${who}${phaseTitle && phaseTitle !== "—" ? ` (${phaseTitle})` : ""}.`;
+    case "remediation":
+      return `Correction des points bloquants de « ${phaseTitle} » par ${who}.`;
+    case "resolution":
+      return `Résolution d'une décision par ${who} (délégation à l'agent expert).`;
+    case "risk-seed":
+      return "Amorçage du registre des risques.";
+    case "task-batch":
+      return `Traitement d'un lot de tâches par ${who}.`;
+    case "app-detect":
+      return "Détection de la configuration de lancement du produit livré.";
     default:
       return rec.label || "Action d'agent.";
   }
@@ -142,13 +160,12 @@ export function buildActivity(config) {
   }
 
   // Per-phase rollup of runtime activity (static phase metadata comes from /api/state).
-  const byPhase = PHASES.map((phase) => {
-    const runs = timeline.filter((t) => t.phaseId === phase.id);
+  const rollup = (phaseId, title, runs) => {
     const agents = [...new Set(runs.map((r) => r.agent).filter(Boolean))];
     const files = [...new Set(runs.flatMap((r) => r.producedFiles))];
     return {
-      phaseId: phase.id,
-      title: phase.title,
+      phaseId,
+      title,
       runCount: runs.length,
       cost: runs.reduce((s, r) => s + r.cost, 0),
       agents,
@@ -159,7 +176,13 @@ export function buildActivity(config) {
         return e && (!acc || e > acc) ? e : acc;
       }, null)
     };
-  });
+  };
+  const byPhase = PHASES.map((phase) => rollup(phase.id, phase.title, timeline.filter((t) => t.phaseId === phase.id)));
+  // Runs not tied to a G0–G7 gate (chat/planification, résolution, orchestré sans étape…):
+  // surface them in a dedicated "Hors étape" bucket so nothing is hidden.
+  const knownPhaseIds = new Set(PHASES.map((p) => p.id));
+  const offPhaseRuns = timeline.filter((t) => !t.phaseId || !knownPhaseIds.has(t.phaseId));
+  if (offPhaseRuns.length) byPhase.push(rollup("—", "Hors étape", offPhaseRuns));
 
   return {
     timeline,

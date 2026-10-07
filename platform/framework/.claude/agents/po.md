@@ -28,6 +28,7 @@ Read active project context and upstream deliverables as needed.
 - Build Epics, Features, and User Stories.
 - Maintain MVP definition and release slicing.
 - Ensure each story is small enough for a vertical slice.
+- Delimit every user-facing story into an explicit **Back** portion and **Front** portion, and tag each story `Full-stack` / `Back-only` / `Front-only`, so no layer can be silently skipped at development.
 - Ensure acceptance criteria are testable and use domain language.
 - Maintain traceability from objectives and KPIs to backlog items.
 
@@ -61,6 +62,7 @@ Read active project context and upstream deliverables as needed.
 **Priorité**: Must / Should / Could / Won't
 **Statut**: À affiner / Prête / En cours / Terminée
 **Complexité estimée**: XS / S / M / L / XL
+**Portée technique**: Full-stack / Back-only / Front-only
 
 ## User Story
 En tant que [persona],
@@ -75,7 +77,12 @@ afin de [bénéfice].
 
 ## Exigences sécurité
 
+## Découpage Back / Front
+- **Back** : règles métier / logique / ports / persistance à implémenter.
+- **Front** : écran(s) concerné(s) (renvoi vers `02-ui/ecrans/[slug].md`), états **Chargement / Vide / Erreur**, composants du `02-ui/ui-kit/`. *(Écrire « N/A » si la portée est Back-only.)*
+
 ## Critères d'acceptation
+Préfixer chaque scénario par `[serveur]` ou `[front]` pour rendre visible la couche testée.
 ```gherkin
 Given ...
 When ...

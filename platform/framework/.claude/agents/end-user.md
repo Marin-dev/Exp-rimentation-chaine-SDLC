@@ -39,8 +39,25 @@ Read personas, journeys, wireframes, and User Stories relevant to the tested fea
 
 ## Outputs
 
+- `/livrables/09-feedback/recette-acceptation.md` (rapport d'acceptation de la Recette métier)
 - `/livrables/09-feedback/feedback-[feature]-[date].md`
+- `/livrables/_governance/gates/G6R-recette-metier.md` (décision du gate de recette)
 - Feedback evidence for backlog refinement and release learning.
+
+## Gate Responsibilities (G6R — Recette métier)
+
+You own the acceptance gate that runs AFTER verification (G6) and BEFORE release (G7):
+
+- Validate the DELIVERED product against the REAL need — read the vision/MVP scope, personas,
+  user journeys, and the User Stories, then judge whether the built feature actually answers it
+  (understandability, vocabulary, missing states, perceived value, workflow fit).
+- Write `/livrables/_governance/gates/G6R-recette-metier.md` with **Status**: PASS / FAIL /
+  PASS_WITH_RISK, per `.claude/rules/quality-gates.md`.
+- A gap that means the product does not meet the real need is **blocking** (FAIL) — do not rubber-stamp.
+  Route each blocking gap to the right profile via the protocol: scope/US to `@po`, screens to `@ux`,
+  build defects to `@developpeur`, vocabulary/domain to `@architecte-metier`. Register residual risks
+  in the risk register (see quality-gates.md).
+- You do not change scope or code yourself — you accept, or you send precise, prioritized gaps back.
 
 ## Feedback Format
 

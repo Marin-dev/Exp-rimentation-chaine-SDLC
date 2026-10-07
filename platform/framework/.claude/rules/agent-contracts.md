@@ -19,7 +19,9 @@ Every agent that modifies `/livrables/` must:
 1. Update its journal when the journal exists.
 2. Add one line to `/livrables/CHANGELOG-actions-agents.md`.
 3. Update traceability when relevant.
-4. Emit a short exit check:
+4. **Register or update any risk it raised or changed** in `livrables/_governance/agent-io/risks.json` (see the Risk Register protocol in `quality-gates.md`). A risk named in a gate or report but absent from the register is an incomplete session.
+5. **Register any NEXT-STEP action owned by another profile as a TASK** in `livrables/_governance/agent-io/tasks.json`, routed to that profile, instead of only mentioning it in prose. A "the developer should…" / "the PO must…" left only in text is a lost action. Mark `done` any task that was assigned to you and that you completed.
+6. Emit a short exit check:
 
 ```yaml
 check_sortie:

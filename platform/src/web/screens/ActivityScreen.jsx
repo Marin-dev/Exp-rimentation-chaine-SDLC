@@ -105,6 +105,49 @@ function TimelineRow({ item, onOpenDecision }) {
   );
 }
 
+/** Activity not tied to a G0–G7 gate (orchestration, chat/planning, resolutions, app-detect…). */
+function OffPhaseCard({ act }) {
+  return (
+    <Card className="p-5 border-dashed">
+      <div className="flex items-start gap-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[15px] font-bold flex items-center gap-1.5">
+              <Layers size={16} className="text-ey-gray01" /> Hors étape
+            </span>
+          </div>
+          <div className="text-[12px] text-ey-gray01 mt-1">
+            Exécutions non rattachées à une gate : pilotage de l'orchestrateur, échanges/consignes,
+            résolutions de décisions, détection du produit…
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-[20px] font-bold leading-none">{act.runCount}</div>
+          <div className="text-[11px] text-ey-gray01">exéc.</div>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-3">
+        <span className="inline-flex items-center gap-1 text-[12px] bg-base-200 rounded px-2 py-1">
+          <Users size={13} className="text-ey-gray01" /> {act.agents.length ? act.agents.join(", ") : "aucun agent"}
+        </span>
+        {act.fileCount > 0 ? (
+          <span className="inline-flex items-center gap-1 text-[12px] bg-base-200 rounded px-2 py-1">
+            <FileText size={13} className="text-ey-gray01" /> {act.fileCount} fichier{act.fileCount > 1 ? "s" : ""}
+          </span>
+        ) : null}
+        {act.cost > 0 ? (
+          <span className="inline-flex items-center gap-1 text-[12px] bg-base-200 rounded px-2 py-1">{fmtUsd(act.cost)}</span>
+        ) : null}
+        {act.lastAt ? (
+          <span className="inline-flex items-center gap-1 text-[12px] text-ey-gray01 px-2 py-1">
+            <Clock size={12} /> {fmtDate(act.lastAt)}
+          </span>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
 function PhaseCard({ phase, act, decisions, onOpenPhase, onOpenDecision }) {
   const types = (phase.docTypes || []).filter((t) => t.items.length > 0);
   const phaseDecisions = decisions.filter((d) => d.phaseId === phase.id);
@@ -367,6 +410,9 @@ export default function ActivityScreen({ state, onOpenPhase, onOpenDecision }) {
                   onOpenDecision={onOpenDecision}
                 />
               ))}
+              {byPhaseMap["—"] && byPhaseMap["—"].runCount > 0 ? (
+                <OffPhaseCard act={byPhaseMap["—"]} />
+              ) : null}
             </div>
           )}
         </>

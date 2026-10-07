@@ -212,8 +212,8 @@ function AutopilotSettingsCard({ state, onStateChange }) {
         <Gauge size={17} className="text-ey-gray01" /> Gestion automatique (autopilote)
       </h3>
       <p className="text-ey-gray01 text-[13px] mt-0 mb-3">
-        Quand elle est activée depuis l'écran Orchestrateur, l'orchestrateur pilote seul : il planifie,
-        lance les agents et fait trancher les experts. Ces réglages bornent son autonomie.
+        Depuis l'écran Orchestrateur, tu donnes une demande et l'orchestrateur l'exécute de bout en bout :
+        il planifie, lance les agents et fait trancher les experts. Ces réglages bornent son autonomie.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">

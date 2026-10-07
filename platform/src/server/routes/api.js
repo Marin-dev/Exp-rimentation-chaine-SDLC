@@ -1016,12 +1016,14 @@ export async function handleApi(req, res, url) {
     }
     if (pathname === "/api/autopilot/start" && req.method === "POST") {
       const body = await readBody(req);
-      // Optional settings passed from the toggle (budget / iterations / concurrency / escalation).
+      // Optional settings passed alongside the demand (budget / iterations / concurrency / escalation).
       if (body && body.settings && typeof body.settings === "object") {
         const config = loadConfig();
         saveConfig({ autopilot: { ...(config.autopilot || {}), ...body.settings } });
       }
-      sendJson(res, 200, { ok: true, ...startAutopilot() });
+      const result = startAutopilot(body && body.request);
+      if (!result.ok) { sendJson(res, 400, result); return true; }
+      sendJson(res, 200, result);
       return true;
     }
     if (pathname === "/api/autopilot/stop" && req.method === "POST") {

@@ -179,11 +179,11 @@ export const Api = {
       body: JSON.stringify({ action })
     }),
   autopilotStatus: () => request("/api/autopilot/status"),
-  autopilotStart: (settings) =>
+  autopilotStart: (requestText, settings) =>
     request("/api/autopilot/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings: settings || null })
+      body: JSON.stringify({ request: requestText, settings: settings || null })
     }),
   autopilotStop: () =>
     request("/api/autopilot/stop", {

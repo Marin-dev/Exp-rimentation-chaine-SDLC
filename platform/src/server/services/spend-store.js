@@ -88,7 +88,8 @@ export function getSpend(paths, pricing) {
   }
 
   return {
-    records: records.slice(-100).reverse().map((r) => ({ ...r, cost: r.cost })),
+    // Full history, newest first (no cap): Coût AND Activité show every run.
+    records: records.slice().reverse().map((r) => ({ ...r, cost: r.cost })),
     pricing: pricing || null,
     summary: {
       totalCost,

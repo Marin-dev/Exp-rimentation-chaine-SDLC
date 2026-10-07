@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadConfig, saveConfig } from "../config/store.js";
 import { createWorkspacePaths } from "../config/paths.js";
-import { startRun, listRuns } from "./runs.js";
+import { startRun, listRuns, getRun } from "./runs.js";
 import { listGroups } from "./group-runner.js";
 import { getSpend } from "./spend-store.js";
 import { listDecisions, getDecision, answerDecision } from "./decisions-store.js";
@@ -12,7 +12,7 @@ import {
   ingestOrchestratorActionsAsTasks,
   applyOrchestratorTaskOps
 } from "./orchestrator-actions.js";
-import { markActionTaskLaunched } from "./tasks-store.js";
+import { markActionTaskLaunched, actionSignature } from "./tasks-store.js";
 import { buildOrchestratorSnapshot } from "./orchestrator-snapshot.js";
 import { buildAutopilotPlanPrompt } from "./run-prompts.js";
 import { readTextSafe } from "./fs-utils.js";
@@ -79,13 +79,19 @@ function persist() {
     const paths = createWorkspacePaths(config.workspaceRoot);
     fs.mkdirSync(path.dirname(paths.autopilotStateFile), { recursive: true });
     const snapshot = {
+      request: session.request,
       startedAt: session.startedAt,
       status: session.status,
       iterations: session.iterations,
       baselineSpend: session.baselineSpend,
       delegated: [...session.delegated],
+      launched: session.launched.slice(-40),
+      launchedSignatures: [...session.launchedSignatures],
+      notedDoneRunIds: [...session.notedDoneRunIds],
       escalations: session.escalations,
       emptyPlans: session.emptyPlans,
+      doneSummary: session.doneSummary || null,
+      result: session.result || null,
       stopReason: session.stopReason,
       stopMessage: session.stopMessage,
       lastError: session.lastError,
@@ -115,6 +121,34 @@ function schedule(ms) {
       schedule(TICK_MS);
     });
   }, ms == null ? TICK_MS : ms);
+}
+
+/** Count files an agent wrote, parsed from its run log ("Écriture · <path>" lines). */
+function filesWrittenInRun(run) {
+  const log = run && run.log ? run.log : "";
+  const set = new Set();
+  const re = /(?:Écriture|Modification) · ([^\n]+)/g;
+  let m;
+  while ((m = re.exec(log))) set.add(m[1].trim());
+  return set.size;
+}
+
+/** Report completion of launched agents once they finish, with a short outcome. */
+function noteFinishedRuns() {
+  if (!session) return;
+  for (const l of session.launched) {
+    if (!l.runId || session.notedDoneRunIds.has(l.runId)) continue;
+    const run = getRun(l.runId);
+    if (!run || run.status === "running") continue; // group ids or still-running: skip for now
+    session.notedDoneRunIds.add(l.runId);
+    const who = l.agent || "L'agent";
+    if (run.status === "done") {
+      const n = filesWrittenInRun(run);
+      note(`✓ ${who} a terminé : ${l.label}${n ? ` — ${n} fichier(s) écrit(s)/modifié(s)` : ""}.`);
+    } else {
+      note(`✗ ${who} n'a pas abouti : ${l.label} (${run.status}).`);
+    }
+  }
 }
 
 /** All agent activity settled — no run and no parallel group is in flight. */
@@ -181,20 +215,20 @@ function isStructural(d) {
 }
 
 /**
- * Launch every autonomously-allowed action the orchestrator just proposed. Runs inside the
- * planning run's onDone (synchronous), so no tick can interleave. Returns the launched count.
+ * Read the orchestrator's turn output: launch every autonomously-allowed action it proposed
+ * and surface whether it declared the demand DONE (with its final report). Runs inside the
+ * planning run's onDone (synchronous), so no tick can interleave. Returns
+ * { launched, done, summary }.
  */
-function executeProposedActions(config, paths) {
+function consumePlanOutput(config, paths) {
   const raw = readTextSafe(paths.orchestratorActionsFile);
   try { fs.rmSync(paths.orchestratorActionsFile, { force: true }); } catch {}
-  if (!raw) return 0;
-  let actions = [];
-  try {
-    const parsed = JSON.parse(raw);
-    actions = Array.isArray(parsed) ? parsed : Array.isArray(parsed.actions) ? parsed.actions : [];
-  } catch {
-    return 0;
-  }
+  if (!raw) return { launched: 0, done: false, summary: "" };
+  let parsed = {};
+  try { parsed = JSON.parse(raw); } catch { return { launched: 0, done: false, summary: "" }; }
+  const actions = Array.isArray(parsed) ? parsed : Array.isArray(parsed.actions) ? parsed.actions : [];
+  const done = Boolean(parsed && !Array.isArray(parsed) && parsed.done);
+  const summary = String((parsed && !Array.isArray(parsed) && parsed.summary) || "").trim();
   let launched = 0;
   for (const action of actions) {
     const type = String(action?.type || "").trim();
@@ -202,30 +236,53 @@ function executeProposedActions(config, paths) {
       note(`Action « ${type} » ignorée (hors périmètre auto — reste manuelle).`);
       continue;
     }
+    // Backstop de-dup: never launch the exact same action twice in one session.
+    const sig = actionSignature(action);
+    if (sig && session && session.launchedSignatures.has(sig)) {
+      note(`Ignoré (déjà lancé dans cette session) : ${action.label || type}.`);
+      continue;
+    }
     const result = executeOrchestratorAction(config, paths, action);
     if (result.ok) {
       launched += 1;
+      const agent = String(action.agent || "").trim();
+      const instr = String(action.instruction || action.rationale || "").replace(/\s+/g, " ").trim();
+      if (session) {
+        if (sig) session.launchedSignatures.add(sig);
+        session.launched.push({
+          at: now(),
+          label: result.label || action.label || type,
+          agent: agent || null,
+          phaseId: action.phaseId || null,
+          runId: result.runId || result.groupId || null
+        });
+      }
       try { markActionTaskLaunched(paths, action, result.runId || result.groupId || null, "@orchestrateur"); } catch {}
-      note(`Lancé automatiquement : ${result.label || action.label || type}.`);
+      // Rich, legible note: which agent, which phase, and what it was asked to do.
+      const who = agent ? `${agent}` : "un agent";
+      const where = action.phaseId ? ` [${action.phaseId}]` : "";
+      note(`▶ ${who}${where} lancé : ${result.label || action.label || type}${instr ? ` — ${instr.slice(0, 160)}` : ""}`);
     } else {
       note(`Échec du lancement « ${action.label || type} » : ${result.error}`);
     }
   }
-  return launched;
+  return { launched, done, summary };
 }
 
-/** One orchestrator planning turn: propose a bounded batch, then auto-launch it. */
+/** One orchestrator planning turn toward the demand: propose a bounded batch, then auto-launch it. */
 function planTurn(config, paths, snapshot) {
   try { fs.rmSync(paths.orchestratorActionsFile, { force: true }); } catch {}
-  note("Planification du prochain lot…");
+  note("Analyse de la demande et planification du prochain lot…");
   startRun(config, {
-    label: "Autopilote · Planification",
+    label: "Copilote · Planification",
     kind: "chat",
     phaseId: null,
     agent: "@orchestrateur",
     prompt: buildAutopilotPlanPrompt({
+      request: session ? session.request : "",
       snapshot,
-      actionsFileRel: "livrables/_governance/agent-io/orchestrator-actions.json"
+      actionsFileRel: "livrables/_governance/agent-io/orchestrator-actions.json",
+      alreadyDone: session ? session.launched.map((l) => `${l.label}${l.agent ? ` (${l.agent}${l.phaseId ? `, ${l.phaseId}` : ""})` : ""}`) : []
     }),
     cwd: paths.workspaceRoot,
     onDone: () => {
@@ -233,9 +290,16 @@ function planTurn(config, paths, snapshot) {
       // tasks and candidate triage is applied — THEN we auto-launch the batch.
       ingestOrchestratorActionsAsTasks(paths, { raisedBy: "@orchestrateur" });
       applyOrchestratorTaskOps(paths);
-      const launched = executeProposedActions(config, paths);
+      const out = consumePlanOutput(config, paths);
       if (!session) return;
-      session.emptyPlans = launched > 0 ? 0 : session.emptyPlans + 1;
+      // The demand is finished only when the orchestrator says so AND it launched nothing
+      // this turn (no work still pending). Otherwise let the launched batch run first.
+      if (out.done && out.launched === 0) {
+        session.doneSummary = out.summary || "Demande accomplie.";
+      } else {
+        session.doneSummary = null;
+      }
+      session.emptyPlans = out.launched > 0 ? 0 : session.emptyPlans + 1;
       persist();
     }
   });
@@ -269,6 +333,10 @@ async function tick() {
     schedule(TICK_MS);
     return;
   }
+
+  // Idle now: report the completion of any launched agent we haven't noted yet, so the
+  // journal shows "✓ terminé" (and files produced) — not just "lancé".
+  noteFinishedRuns();
 
   // 3. Pending decisions → delegate to the expert; escalate to the human only if the
   //    expert couldn't decide (a decision still pending AFTER its resolver has run).
@@ -314,35 +382,44 @@ async function tick() {
     return;
   }
 
-  // 4. Nothing pending. Are we done, stuck, or is there a next batch to plan?
-  const snap = await buildOrchestratorSnapshot(config, paths);
-  if (snap.converged) {
-    finish("converged", "Tous les gates sont passés — la chaîne a convergé.");
+  // 4. Nothing pending. Did the orchestrator declare the demand accomplished?
+  if (session.doneSummary) {
+    session.result = session.doneSummary;
+    finish("done", session.doneSummary);
     return;
   }
+  // Stuck: it proposes nothing and doesn't declare the demand done — ask the human.
   if (session.emptyPlans >= MAX_EMPTY_PLANS) {
     finish(
       "stuck",
-      "L'orchestrateur ne propose plus d'action mais l'objectif n'est pas atteint — une intervention humaine est nécessaire."
+      "L'orchestrateur ne parvient plus à faire avancer la demande sans intervention. Précise ou reformule ta demande."
     );
     return;
   }
+  // Otherwise: plan the next batch toward the demand (gates are context, not the objective).
+  const snap = await buildOrchestratorSnapshot(config, paths, { contextOnly: true });
   session.iterations += 1;
   planTurn(config, paths, snap.text);
   persist();
   schedule(TICK_MS);
 }
 
-function startSession(baselineSpend, restored) {
+function startSession(request, baselineSpend, restored) {
   session = {
+    request: (restored && restored.request) || request || "",
     startedAt: (restored && restored.startedAt) || now(),
     status: "running",
     iterations: (restored && restored.iterations) || 0,
     baselineSpend: restored && typeof restored.baselineSpend === "number" ? restored.baselineSpend : baselineSpend,
     spentUsd: 0,
     delegated: new Set(restored && Array.isArray(restored.delegated) ? restored.delegated : []),
+    launched: (restored && Array.isArray(restored.launched) ? restored.launched : []),
+    launchedSignatures: new Set(restored && Array.isArray(restored.launchedSignatures) ? restored.launchedSignatures : []),
+    notedDoneRunIds: new Set(restored && Array.isArray(restored.notedDoneRunIds) ? restored.notedDoneRunIds : []),
     escalations: (restored && restored.escalations) || [],
     emptyPlans: (restored && restored.emptyPlans) || 0,
+    doneSummary: (restored && restored.doneSummary) || null,
+    result: (restored && restored.result) || null,
     activity: (restored && restored.activity) || [],
     lastError: null,
     stopReason: null,
@@ -351,15 +428,20 @@ function startSession(baselineSpend, restored) {
   };
 }
 
-/** Turn autopilot ON and kick the loop. */
-export function startAutopilot() {
+/**
+ * Start a COPILOT run: the human hands ONE demand and the orchestrator carries it out
+ * end to end. Requires a non-empty request — without a demand there's nothing to drive.
+ */
+export function startAutopilot(request) {
+  const demand = String(request || "").trim();
+  if (!demand) return { ok: false, error: "Précise ce que tu veux que l'orchestrateur fasse." };
   const config = loadConfig();
   const paths = createWorkspacePaths(config.workspaceRoot);
   saveConfig({ autopilot: { ...(config.autopilot || {}), enabled: true } });
-  startSession(safeSpend(paths, config.pricing));
-  note("Gestion automatique activée — l'orchestrateur prend le pilotage.");
+  startSession(demand, safeSpend(paths, config.pricing));
+  note(`Demande reçue : « ${demand} ». L'orchestrateur s'en occupe.`);
   schedule(1200);
-  return getAutopilotStatus();
+  return { ok: true, ...getAutopilotStatus() };
 }
 
 /** Turn autopilot OFF. In-flight runs finish on their own; no new work is started. */
@@ -415,6 +497,10 @@ export function answerEscalation(input) {
 export function getAutopilotStatus() {
   const config = loadConfig();
   const ap = config.autopilot || {};
+  // The agent currently working (if any) — lets the UI show its live console.
+  const running = listRuns().filter((r) => r.status === "running");
+  const cur = running[0] || null;
+  const currentRun = cur ? { id: cur.id, label: cur.label, agent: cur.agent, kind: cur.kind, phaseId: cur.phaseId } : null;
   return {
     enabled: Boolean(ap.enabled),
     settings: {
@@ -423,12 +509,16 @@ export function getAutopilotStatus() {
       budgetUsd: ap.budgetUsd ?? 0,
       escalation: ap.escalation || "expert-blocked"
     },
+    currentRun,
     session: session
       ? {
+          request: session.request || "",
           status: session.status,
           iterations: session.iterations,
           spentUsd: session.spentUsd || 0,
           escalations: session.escalations || [],
+          launched: (session.launched || []).slice(-12),
+          result: session.result || null,
           stopReason: session.stopReason || null,
           stopMessage: session.stopMessage || null,
           lastError: session.lastError || null,
@@ -451,15 +541,19 @@ export function resumeAutopilotOnBoot() {
   let restored = null;
   const raw = readTextSafe(paths.autopilotStateFile);
   if (raw) { try { restored = JSON.parse(raw); } catch {} }
+  // No demand to drive (or the run had already finished) → nothing to resume; clear the flag.
+  if (!restored || !String(restored.request || "").trim() || restored.status === "stopped") {
+    try { saveConfig({ autopilot: { ...(config.autopilot || {}), enabled: false } }); } catch {}
+    return { resumed: false };
+  }
+  startSession(restored.request, safeSpend(paths, config.pricing), restored);
   // A session that had paused for the human stays paused until they answer.
-  const wasWaiting = restored && restored.status === "waiting-human" && (restored.escalations || []).length;
-  startSession(safeSpend(paths, config.pricing), restored);
-  if (wasWaiting) {
+  if (restored.status === "waiting-human" && (restored.escalations || []).length) {
     session.status = "waiting-human";
     clearTimer();
     return { resumed: true, waiting: true };
   }
-  note("Reprise de la gestion automatique après redémarrage du serveur.");
+  note("Reprise de la demande en cours après redémarrage du serveur.");
   schedule(2000);
   return { resumed: true, waiting: false };
 }
