@@ -6,51 +6,28 @@ This document gives a structural view of the project-agnostic AI Dev Chain.
 
 ```text
 .
-├── CLAUDE.md
-├── .claude/
-│   ├── agents/
-│   │   ├── project-bootstrapper.md
-│   │   ├── sponsor.md
-│   │   ├── discovery-reviewer.md
-│   │   ├── ux.md
-│   │   ├── ui-designer.md
-│   │   ├── architecte-metier.md
-│   │   ├── architecte-technique.md
-│   │   ├── security-architect.md
-│   │   ├── po.md
-│   │   ├── spec-reviewer.md
-│   │   ├── developpeur.md
-│   │   ├── code-quality-reviewer.md
-│   │   ├── appsec-reviewer.md
-│   │   ├── qa.md
-│   │   ├── test-reviewer.md
-│   │   ├── devops.md
-│   │   ├── release-judge.md
-│   │   ├── agent-security-guard.md
-│   │   ├── end-user.md
-│   │   └── architecture-reviewer.md
-│   ├── project/
-│   │   ├── PROJECT.md
-│   │   └── docupost/
-│   │       ├── context.md
-│   │       ├── stack.md
-│   │       └── security-context.md
-│   ├── rules/
-│   │   ├── agent-contracts.md
-│   │   ├── conventions-livrables.md
-│   │   ├── quality-gates.md
-│   │   ├── security.md
-│   │   ├── judge-rubrics.md
-│   │   └── domaine-docupost.md
+├── CLAUDE.md                     # copied from the platform template at project creation
+├── .claude/                      # reusable framework; read-only for agents
+│   ├── agents/                   # generic roles (sponsor, ux, ui-designer, po, developpeur, …)
+│   ├── rules/                    # contracts, gates, security, judge rubrics, UI quality, runtime safety
 │   ├── skills/
 │   ├── mcp.json
-│   └── settings.json
+│   ├── ORCHESTRATION.md
+│   ├── VERIFICATION.md
+│   └── control-center/           # platform-owned state (runs, spend, registers); not edited by agents
+├── project/                      # project profile, written by @project-bootstrapper
+│   ├── PROJECT.md
+│   └── [project-slug]/
+│       ├── context.md            # domain, users, domain seed
+│       ├── stack.md
+│       ├── security-context.md
+│       └── intake-inventory.md
 └── livrables/
     ├── 00-contexte/
     ├── 01-vision/
     ├── 02-ux/
     ├── 02-ui/
-    ├── 03-architecture-metier/
+    ├── 03-architecture-metier/   # incl. dev-waves.json (BC dependency order for G5)
     ├── 04-architecture-technique/
     ├── 05-backlog/
     ├── 06-dev/
@@ -59,7 +36,8 @@ This document gives a structural view of the project-agnostic AI Dev Chain.
     ├── 09-feedback/
     ├── 10-security/
     ├── 11-evaluations/
-    └── _governance/
+    ├── _inputs/                  # human-provided documents per phase
+    └── _governance/              # gates, decisions, risks, tasks, agent-io (platform contract)
 project-intake/
     ├── 00-brief/
     ├── 01-business/
@@ -150,8 +128,7 @@ Reusable:
 
 Replace per project:
   project/PROJECT.md
-  project/[project]/*
-  .claude/rules/domaine-[project].md when needed
+  project/[project]/*   (context with the domain seed, stack, security context)
 
 Generated during delivery:
   /livrables/*

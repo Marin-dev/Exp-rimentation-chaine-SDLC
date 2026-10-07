@@ -202,7 +202,7 @@ if (pathname === "/api/mon-truc" && req.method === "GET") {
 | `audit-decisions.js` | Contrôle de cohérence des décisions déjà répondues ; rouvre celles incohérentes ou non documentées. |
 | `risks-store.js` / `tasks-store.js` | Registres risques et tâches (`project-state.json` + miroir lisible sous `_governance/`). Tâche `proposed` = candidate non actionnable. |
 | `coordination.js` | Convergence : un gate en PASS propre clôt les tâches encore ouvertes de sa phase. |
-| `dev-batches.js` | G5 en vagues : US prêtes groupées par Bounded Context, lanes `@developpeur` parallèles. |
+| `dev-batches.js` | G5 en vagues : US prêtes groupées par Bounded Context, lanes `@developpeur` parallèles. Ordre des BC lu dans `03-architecture-metier/dev-waves.json` (sinon un BC par vague), noms dans `bounded-contexts.md`. |
 
 ---
 

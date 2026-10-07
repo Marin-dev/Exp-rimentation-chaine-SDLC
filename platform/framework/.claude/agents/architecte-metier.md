@@ -47,6 +47,7 @@ and field vocabulary/journeys from UX refine the domain model before G2.
 - `/livrables/03-architecture-metier/domain-model.md`
 - `/livrables/03-architecture-metier/capability-map.md`
 - `/livrables/03-architecture-metier/modules-fonctionnels.md`
+- `/livrables/03-architecture-metier/dev-waves.json` (dependency order between Bounded Contexts, used by the platform to schedule G5 development)
 - Domain evidence for `G2 - Domain, UX And UI Ready`
 
 ## DDD Rules
@@ -77,6 +78,14 @@ and field vocabulary/journeys from UX refine the domain model before G2.
 **Domain Events émis**:
 **Frontières**:
 **Classification**: Core / Supporting / Generic
+```
+
+`dev-waves.json` - BCs grouped into ordered waves: a BC comes after every BC it depends on;
+BCs of the same wave are independent and are developed in parallel. Derive it from the
+context map (upstream before downstream). Use the BC ids of `bounded-contexts.md`:
+
+```json
+{ "waves": [["BC-01", "BC-02"], ["BC-03"], ["BC-04"]] }
 ```
 
 `context-map.md`:

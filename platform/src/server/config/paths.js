@@ -55,6 +55,9 @@ export function createWorkspacePaths(workspaceRootInput = defaultWorkspaceRoot) 
     runsDir: path.join(stateDir, "runs"),
     spendFile: path.join(stateDir, "spend.json"),
     newNeedsFile: path.join(livrablesDir, "00-contexte", "nouveaux-besoins.md"),
+    // Domain model: BC names (headings) and the cross-BC dependency order for G5 dev waves.
+    boundedContextsFile: path.join(livrablesDir, "03-architecture-metier", "bounded-contexts.md"),
+    devWavesFile: path.join(livrablesDir, "03-architecture-metier", "dev-waves.json"),
     // Per-phase human-provided INPUT documents (sources the agents must consume).
     inputsDir: path.join(livrablesDir, "_inputs"),
     // AI agent I/O contract. These live UNDER /livrables (not .claude/) because

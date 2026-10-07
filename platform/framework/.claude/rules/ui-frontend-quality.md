@@ -6,15 +6,15 @@ under `/livrables/02-ui/prototypes/`) and later implemented by `@developpeur`.
 These rules are **enforceable and verifiable**. `@ui-designer` applies them; `@qa` and
 `@discovery-reviewer` can check them; `@developpeur` carries them into production code.
 
-**Reference screen**: the canonical, fully-compliant worked example is
-`/livrables/02-ui/prototypes/espace-mission-workspace.html`. New screens mirror its
-patterns rather than reinventing them.
+**Reference screen**: once the project has one fully-compliant prototype, `@ui-designer`
+declares it in `design-system.md` as the reference screen. New screens mirror its patterns
+rather than reinventing them.
 
 ## R1 — Design system is the source of truth
 
 - Use only the tokens, brand ramp, typography, spacing, and components declared in the
   active project `design-system.md`. No ad-hoc colors, fonts, or spacing values.
-- When a project has a committed UI library / tone (e.g. Fluent 2, sober institutional),
+- When a project has a committed UI library / tone (e.g. Material, Fluent, Carbon, or a sober institutional tone),
   it **overrides** any generic "bold aesthetic" instinct from the `frontend-design` skill.
   Craft = refined execution *within* the system, never a license to reinvent identity.
 - Every reusable pattern (badge, header, table row) matches the `ui-kit/` component.
@@ -81,12 +81,12 @@ Every screen renders, and every prototype demonstrates, these states where relev
 When producing or reviewing a screen, confirm each rule is satisfied and, for the
 reference screen, that it is *demonstrated*:
 
-| Rule | Demonstrated in reference screen |
+| Rule | What the reference screen must demonstrate |
 |---|---|
-| R1 tokens | eDataDoc brand ramp + Segoe UI + spacing tokens as CSS variables |
-| R2 states | Empty (Logistique cloisonnée, Décisions), overdue error, permission-denied pattern |
-| R3 a11y | ARIA tablist + arrow keys, `:focus-visible`, skip link, `aria-hidden` on decorative SVG, `role="status"` banner |
-| R4 language | FR labels + EN canonical in tooltip; status mapping from design-system |
-| R5 rules | "Version faisant foi" only on current doc; confidential banner; cloisonnement |
-| R6 layout | AppShell max-width, sidebar, tab overflow, responsive intent |
-| R7 craft | Functional tabs, token variables, refined states, restrained motion |
+| R1 tokens | Brand ramp, typography and spacing tokens as CSS variables, all from `design-system.md` |
+| R2 states | At least an empty state with an exit action, an error with recovery, and a permission-denied pattern |
+| R3 a11y | Correct ARIA patterns with keyboard navigation, `:focus-visible`, skip link, `aria-hidden` on decorative SVG, live region for banners |
+| R4 language | Ubiquitous-language labels; status labels from the design-system mapping (and the bilingual convention, if any) |
+| R5 rules | Authoritative markers only on the authoritative item; confidential content not rendered; actions conditioned on state and role |
+| R6 layout | Layout tokens (max width, sidebar), overflow handling, defined responsive behavior |
+| R7 craft | Working interactions, token variables, refined interactive states, restrained motion |

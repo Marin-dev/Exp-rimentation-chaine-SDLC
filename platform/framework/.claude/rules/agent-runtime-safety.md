@@ -27,5 +27,5 @@ When a port is occupied (e.g. a stale Vite on `5173`), free **that port**, nothi
 
 ## E2E / Playwright
 
-- The front (Vite) web server for e2e MUST NOT reuse a possibly-stale existing server — start a fresh one so tests run against the current config (`reuseExistingServer: false` for the front). Reusing the slow .NET host (`:5000`) is fine.
+- The front (Vite) web server for e2e MUST NOT reuse a possibly-stale existing server — start a fresh one so tests run against the current config (`reuseExistingServer: false` for the front). Reusing a slow-starting back-end host is fine as long as its configuration has not changed.
 - Screenshots and artifacts written under `playwright-report/` are wiped by the HTML reporter at end of run — write proof artifacts to a dedicated folder outside it.

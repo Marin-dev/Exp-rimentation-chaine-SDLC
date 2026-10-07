@@ -36,7 +36,7 @@ A User Story is done only when:
 - Code implements only the intended scope.
 - Automated tests cover acceptance criteria at the right level.
 - Relevant L1/L2/L3 tests have been executed or blocked with a precise cause.
-- **Both the Back and the Front portions of the slice are delivered.** For a user-facing story not tagged `Back-only`, "done" requires the screen(s) actually built and wired — `Chargement` / `Vide` / `Erreur` states handled per the UI spec — not only the server logic. Fluent-2 (or design-system) components authored but never assembled into a running screen do **not** satisfy the front portion.
+- **Both the Back and the Front portions of the slice are delivered.** For a user-facing story not tagged `Back-only`, "done" requires the screen(s) actually built and wired — `Chargement` / `Vide` / `Erreur` states handled per the UI spec — not only the server logic. Design-system components authored but never assembled into a running screen do **not** satisfy the front portion.
 - For a user-facing story, at least one **L3 / UI evidence is executed** (an automated UI/E2E test, or at minimum "the app renders this screen against the real back"). A story whose front layer is absent is **`FAIL`, never `PASS_WITH_RISK`**. Deferring the UI is a scope change that requires an explicit, human-arbitrated decision recorded under `_governance/decisions/` — it must not ride as a residual risk.
 - AppSec review is passed or risk is accepted by the human.
 - Traceability matrix links the US to code, tests, security review, and feedback.

@@ -16,8 +16,8 @@ Verification of the project-agnostic multi-agent architecture after refactoring.
 | All agent files reference `project/PROJECT.md` | PASS |
 | All agent files reference `.claude/rules/agent-contracts.md` | PASS |
 | Basic Markdown code-fence balance in agent files | PASS |
-| No DocuPost/logistics/stack/local-path coupling in generic agents or `CLAUDE.md` | PASS |
-| Project-specific context retained under `project/` and `domaine-docupost.md` | PASS |
+| No project, domain, stack, or local-path coupling in generic agents or `CLAUDE.md` | PASS |
+| Project-specific context retained under `project/` only | PASS |
 | Rule files are present and non-empty | PASS |
 | `@ui-designer` agent is present and integrated into orchestration | PASS |
 | G2 labels consistently include Domain, UX, and UI | PASS |
@@ -36,8 +36,7 @@ Reusable core:
 Project-specific layer:
 
 - `project/PROJECT.md`
-- `project/docupost/`
-- `.claude/rules/domaine-docupost.md`
+- `project/[project-slug]/`
 
 Generated delivery evidence:
 

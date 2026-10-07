@@ -11,36 +11,37 @@ import path from "node:path";
  * conflicts on the same module/aggregate. A final consolidation lane merges the
  * shared governance files once (no concurrent appends).
  *
- * "Dynamic" = the US→BC grouping, which US are still to develop, and the counts are
- * read from disk each launch. Only the cross-BC dependency ORDER is declared here,
- * because that is domain knowledge the US files do not encode machine-readably.
+ * Everything is read from the project on each launch: the US→BC grouping, which US
+ * are still to develop, the BC names (headings of bounded-contexts.md) and the
+ * cross-BC dependency order (dev-waves.json, owned by @architecte-metier:
+ * { "waves": [["BC-08", "BC-10"], ["BC-01"], ...] }). Without dev-waves.json the
+ * BCs run one per wave in id order — slower, but safe for unknown dependencies.
  */
 
-// Dependency tiers: each inner array is a wave; its BCs run as parallel lanes.
-// Foundations (access guard, audit) first; then the mission-lifecycle pipeline.
-const BC_TIERS = [
-  ["BC-08", "BC-10"], // fondations : garde d'accès + audit (contrats transverses)
-  ["BC-09", "BC-01"], // notifications + engagement/calendrier
-  ["BC-02"],          // orchestration de mission
-  ["BC-03"],          // demandes / inputs
-  ["BC-04"],          // document final
-  ["BC-05"],          // sign-off
-  ["BC-06"],          // knowledge & archive
-  ["BC-07"]           // recherche
-];
+/** BC id -> name, from the `## BC-NN : Name` headings of bounded-contexts.md. */
+function readBcNames(paths) {
+  let text = "";
+  try { text = fs.readFileSync(paths.boundedContextsFile, "utf8"); } catch { return {}; }
+  const names = {};
+  for (const m of text.matchAll(/^#{2,3}\s*(BC-\d+)\s*[:\-–]\s*(.+)$/gim)) {
+    names[m[1].toUpperCase()] = m[2].trim();
+  }
+  return names;
+}
 
-const BC_NAMES = {
-  "BC-01": "Engagement & Calendrier",
-  "BC-02": "Mission Orchestration",
-  "BC-03": "Demandes / Inputs",
-  "BC-04": "Document final",
-  "BC-05": "Sign-off",
-  "BC-06": "Knowledge & Archive",
-  "BC-07": "Recherche",
-  "BC-08": "Access & Confidentiality",
-  "BC-09": "Notifications",
-  "BC-10": "Audit"
-};
+/** Declared dependency waves, or null when the project has not declared them. */
+function readDeclaredWaves(paths) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(paths.devWavesFile, "utf8"));
+    const waves = (parsed.waves || [])
+      .filter(Array.isArray)
+      .map((w) => w.map((bc) => String(bc).toUpperCase()))
+      .filter((w) => w.length);
+    return waves.length ? waves : null;
+  } catch {
+    return null;
+  }
+}
 
 function usDir(paths) {
   return path.join(paths.livrablesDir, "05-backlog", "user-stories");
@@ -81,14 +82,15 @@ function laneKey(bc) {
   return `dev-${bc.toLowerCase().replace(/-/g, "")}`; // BC-01 -> dev-bc01
 }
 
-function makeLane(bc, list) {
+function makeLane(bc, list, names) {
+  const bcName = names[bc] || bc;
   return {
     kind: "dev-lane",
     agentKey: laneKey(bc),
     agent: "@developpeur",
     bc,
-    bcName: BC_NAMES[bc] || bc,
-    goal: `Développer les User Stories du Bounded Context ${bc} (${BC_NAMES[bc] || bc})`,
+    bcName,
+    goal: `Développer les User Stories du Bounded Context ${bc} (${bcName})`,
     folders: ["06-dev"],
     usList: list.map((u) => ({
       id: u.id,
@@ -114,6 +116,7 @@ export function buildUsReport(paths) {
   } catch {
     return { ok: false, error: "Dossier user-stories introuvable.", total: 0, developedCount: 0, todoCount: 0, developed: [], todo: [] };
   }
+  const names = readBcNames(paths);
   const all = files
     .map((f) => parseUS(dir, f))
     .filter(Boolean)
@@ -127,7 +130,7 @@ export function buildUsReport(paths) {
       title: u.title,
       file: u.file,
       primaryBC: u.primaryBC,
-      bcName: u.primaryBC ? BC_NAMES[u.primaryBC] || u.primaryBC : null,
+      bcName: u.primaryBC ? names[u.primaryBC] || u.primaryBC : null,
       integrationBCs: u.integrationBCs,
       developed: isDeveloped(paths, u.id)
     };
@@ -174,16 +177,23 @@ export function buildDevBatches(paths) {
   // Deterministic US order within a lane (by id).
   for (const list of byBC.values()) list.sort((a, b) => a.id.localeCompare(b.id));
 
-  const knownBCs = new Set(BC_TIERS.flat());
+  const names = readBcNames(paths);
+  const declared = readDeclaredWaves(paths);
+  // Undeclared order: one BC per wave, by id (no parallelism we can't justify).
+  const tiers = declared
+    || [...byBC.keys()].filter((bc) => bc !== "BC-?")
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map((bc) => [bc]);
+  const knownBCs = new Set(tiers.flat());
   const stages = [];
   const waveMeta = [];
 
-  // Ordered waves from the declared tiers.
-  for (const tier of BC_TIERS) {
+  // Ordered waves from the declared (or default) tiers.
+  for (const tier of tiers) {
     const lanes = [];
     for (const bc of tier) {
       const list = byBC.get(bc);
-      if (list && list.length) lanes.push(makeLane(bc, list));
+      if (list && list.length) lanes.push(makeLane(bc, list, names));
     }
     if (lanes.length) {
       stages.push(lanes);
@@ -194,7 +204,7 @@ export function buildDevBatches(paths) {
   // Any BC not in the dependency map -> final "misc" wave, flagged.
   const unknownBCs = [...byBC.keys()].filter((bc) => !knownBCs.has(bc));
   if (unknownBCs.length) {
-    const lanes = unknownBCs.map((bc) => makeLane(bc, byBC.get(bc)));
+    const lanes = unknownBCs.map((bc) => makeLane(bc, byBC.get(bc), names));
     stages.push(lanes);
     waveMeta.push({ misc: true, bcs: lanes.map((l) => ({ bc: l.bc, name: l.bcName, us: l.usList.length })) });
   }
@@ -220,6 +230,7 @@ export function buildDevBatches(paths) {
       skippedDeveloped: skippedDeveloped.length,
       skippedList: skippedDeveloped,
       unknownBCs,
+      orderSource: declared ? "dev-waves.json" : "default",
       waves: waveMeta
     }
   };

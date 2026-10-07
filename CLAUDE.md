@@ -15,7 +15,7 @@ Détail du code (services, écrans, ajout d'endpoint ou d'écran) : `platform/RE
 |---|---|---|---|
 | **Code de l'app** | `platform/src/` | Backend Node + front React | Nous |
 | **Socle livré aux projets** | `platform/framework/` | `CLAUDE.template.md` (→ `CLAUDE.md` du projet) + `.claude/` (agents, rules, skills, mcp, ORCHESTRATION/VERIFICATION) | Nous ; copié tel quel à la création d'un projet |
-| **Workspace projet** | `config.workspaceRoot` (ex. `C:\Github\Projet plateforme collaboration EY V1`) | Copie du socle + `project/` + `livrables/` + code produit | Les agents, et la plateforme pour son état |
+| **Workspace projet** | `config.workspaceRoot` (un dossier hors de ce repo) | Copie du socle + `project/` + `livrables/` + code produit | Les agents, et la plateforme pour son état |
 
 - État **de l'app** : `platform/.state/config.json` (workspace actif, commande claude,
   `permissionMode`, app à lancer, politiques, autopilote, tarifs). Non versionné.
@@ -24,7 +24,7 @@ Détail du code (services, écrans, ajout d'endpoint ou d'écran) : `platform/RE
 - Contrat agent ↔ plateforme : `<workspace>/livrables/_governance/agent-io/`
   (`pending-input.json`, `answers.json`, `resolutions.json`, `risks.json`, `tasks.json`).
 - Modifier `platform/framework/` ne change **pas** les projets existants : leur copie
-  est figée à la création. Reporter à la main si besoin (ex. `CLAUDE.md` d'eDataDoc).
+  est figée à la création. Reporter à la main dans un projet existant si besoin.
 
 ## Fonctionnement
 
@@ -58,7 +58,9 @@ Détail du code (services, écrans, ajout d'endpoint ou d'écran) : `platform/RE
    **jamais** lancées en automatique.
 8. **Dev G5 en vagues** (`dev-batches.js`) : les US prêtes sont groupées par Bounded
    Context ; une vague = plusieurs lanes `@developpeur` en parallèle, chacune avec ses
-   propres fichiers agent-io.
+   propres fichiers agent-io. L'ordre des vagues vient de
+   `livrables/03-architecture-metier/dev-waves.json` (produit par `@architecte-metier`) ;
+   sans ce fichier, un BC par vague, par ordre d'id.
 9. **Au démarrage** (`server.js`) : les runs encore vivants sont ré-adoptés, l'ingestion
    des runs finis est rattrapée, et l'autopilote reprend s'il était actif.
 
@@ -86,8 +88,7 @@ du backend un redémarrage.
 - **Les agents n'écrivent jamais dans `.claude/`** (protégé en headless) : tout ce qu'ils
   produisent va dans `project/` ou `livrables/`.
 - **`config/paths.js` est la seule source des chemins disque.**
-- **Pas de savoir propre à un projet** dans `platform/src/` ni `platform/framework/`. Points
-  à nettoyer : `framework/.claude/rules/domaine-docupost.md`, l'ordre des BC codé en dur
-  dans `dev-batches.js`, l'écran de référence eDataDoc cité dans `ui-frontend-quality.md`.
+- **Pas de savoir propre à un projet** dans `platform/src/` ni `platform/framework/` : ce qui
+  dépend du domaine se lit dans le workspace (ex. ordre des BC dans `dev-waves.json`).
 - Toute modification d'agents, permissions, MCP ou hooks du socle → revue `@agent-security-guard`.
 - UI : icônes lucide, pas d'emoji ; primitives de `web/components/ui.jsx` ; thème EY.
