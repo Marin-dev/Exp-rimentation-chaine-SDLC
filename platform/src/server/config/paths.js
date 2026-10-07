@@ -10,7 +10,7 @@ export const distDir = path.join(platformRoot, "dist");
 export const appStateDir = path.join(platformRoot, ".state");
 export const configPath = path.join(appStateDir, "config.json");
 
-// App-bundled framework template. Mirrors a workspace layout (CLAUDE.md + .claude/…)
+// App-bundled framework template. Mirrors a workspace layout (CLAUDE.template.md → CLAUDE.md, + .claude/…)
 // so createWorkspacePaths(frameworkRoot) yields its agents/skills/mcp paths directly.
 // This is the "en dur" source copied into every new project.
 export const frameworkRoot = path.join(platformRoot, "framework");

@@ -2,16 +2,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { frameworkRoot } from "../config/paths.js";
 
-// Reusable framework copied into every new project workspace.
+// Reusable framework copied into every new project workspace, as [source, destination].
+// The project prompt is stored as CLAUDE.template.md so Claude Code does not load it as
+// nested instructions while we work on the platform repo; it becomes CLAUDE.md in the project.
 const FRAMEWORK_ITEMS = [
-  "CLAUDE.md",
+  ["CLAUDE.template.md", "CLAUDE.md"],
   path.join(".claude", "agents"),
   path.join(".claude", "rules"),
   path.join(".claude", "skills"),
   path.join(".claude", "mcp.json"),
   path.join(".claude", "ORCHESTRATION.md"),
   path.join(".claude", "VERIFICATION.md")
-];
+].map((item) => (Array.isArray(item) ? item : [item, item]));
 
 // Empty deliverable structure created in a fresh project.
 const LIVRABLES_DIRS = [
@@ -50,17 +52,18 @@ export function scaffoldProject(targetPath) {
   if (fs.existsSync(path.join(resolved, ".claude", "agents"))) {
     return { ok: false, error: "Ce dossier contient déjà un projet (.claude/agents existe)." };
   }
-  if (!fs.existsSync(path.join(sourceRoot, ".claude", "agents"))) {
-    return { ok: false, error: "Socle de l'app introuvable (platform/framework/.claude/agents). Impossible de copier les agents." };
+  // The bundled template is ours: a missing item is a packaging bug, not an option.
+  // Refuse rather than silently scaffold a project without (e.g.) its CLAUDE.md.
+  const missing = FRAMEWORK_ITEMS.map(([from]) => from).filter((from) => !fs.existsSync(path.join(sourceRoot, from)));
+  if (missing.length) {
+    return { ok: false, error: `Socle de l'app incomplet (platform/framework) : ${missing.join(", ")} introuvable(s).` };
   }
 
   try {
     fs.mkdirSync(resolved, { recursive: true });
-    // Copy framework items that exist in the source.
-    for (const item of FRAMEWORK_ITEMS) {
-      const src = path.join(sourceRoot, item);
-      if (!fs.existsSync(src)) continue;
-      const dest = path.join(resolved, item);
+    for (const [from, to] of FRAMEWORK_ITEMS) {
+      const src = path.join(sourceRoot, from);
+      const dest = path.join(resolved, to);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.cpSync(src, dest, { recursive: true });
     }
