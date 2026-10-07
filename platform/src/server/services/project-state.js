@@ -149,7 +149,8 @@ export async function buildProjectState(config) {
       workspaceExists,
       policies: config.policies || { libraries: { mode: "ask", allowed: [] } },
       permissionMode: config.permissionMode || "bypassPermissions",
-      autopilot: config.autopilot || null
+      autopilot: config.autopilot || null,
+      supportTemplates: config.supportTemplates || { pptx: null, docx: null }
     },
     project: {
       ...project,

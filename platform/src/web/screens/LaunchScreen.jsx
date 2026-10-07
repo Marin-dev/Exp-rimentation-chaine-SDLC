@@ -5,6 +5,7 @@ import { Card, EmptyState, GateBadge } from "../components/ui.jsx";
 import RunConsole from "../components/RunConsole.jsx";
 import RunNextSteps from "../components/RunNextSteps.jsx";
 import FolderInput from "../components/FolderInput.jsx";
+import ClientSources from "../components/ClientSources.jsx";
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -124,6 +125,9 @@ export default function LaunchScreen({ state, activeRun, onRunStarted, onStartNe
         </div>
       ) : (
         <>
+          {/* Bootstrap from a rich client folder */}
+          <ClientSources state={state} onRunStarted={onRunStarted} />
+
           {/* Intake picker */}
           <Card className="p-5 mt-5">
             <h3 className="text-base font-bold mt-0 mb-1 flex items-center gap-2">

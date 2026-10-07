@@ -18,6 +18,8 @@ const DEFAULT_CONFIG = {
     backend: { command: "", cwd: "" },
     frontend: { command: "", cwd: "", url: "" }
   },
+  // Templates used as style examples for generated supports (files under .state/templates/).
+  supportTemplates: { pptx: null, docx: null },
   // Governance policies that shape what agents may do autonomously.
   policies: {
     // mode "ask": the agent must request approval before a non-approved library.

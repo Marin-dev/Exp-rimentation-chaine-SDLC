@@ -60,6 +60,7 @@ const PHASE_TYPE_DEFS = {
     { key: "epics", label: "Epics", folder: "05-backlog", re: /epic/i },
     { key: "features", label: "Features", folder: "05-backlog", re: /feature/i },
     { key: "defmvp", label: "Définition MVP", folder: "05-backlog", re: /definition-mvp/i },
+    { key: "planning", label: "Planning", folder: "05-backlog", re: /^planning/i },
     { key: "us", label: "User Stories", folder: "05-backlog", re: /user.?stor|\bus-/i },
     { key: "backlog-autres", label: "Autres (backlog)", folder: "05-backlog", catchAll: true },
     { key: "spec-review", label: "Revue de spec", folder: "11-evaluations", re: /spec/i }

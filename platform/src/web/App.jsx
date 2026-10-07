@@ -182,6 +182,19 @@ export default function App() {
     }
   }
 
+  // Generate a PowerPoint / Word support of the whole project up to this phase.
+  async function startSupport(phaseId, format) {
+    try {
+      const res = await Api.createSupport(phaseId, format);
+      setActiveGroup(null);
+      setActiveRun({ id: res.runId, label: res.label, phaseId });
+      setSelectedPhaseId(phaseId);
+      setScreen("phase");
+    } catch (e) {
+      setNotice({ type: "error", text: e.message });
+    }
+  }
+
   async function startReviewRun(phaseId) {
     try {
       const phase = state.phases.find((p) => p.id === phaseId);
@@ -339,6 +352,7 @@ export default function App() {
             onLaunchParallel={startPhaseParallel}
             onLaunchDevBatches={startDevBatches}
             onLaunchReview={startReviewRun}
+            onGenerateSupport={startSupport}
             onRemediateRisks={startRemediation}
             onGoPhase={(id) => { setSelectedPhaseId(id); setScreen("phase"); }}
             onNavigate={navigate}

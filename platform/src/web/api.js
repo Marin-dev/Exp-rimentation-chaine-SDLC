@@ -13,6 +13,14 @@ async function request(url, options) {
   return data;
 }
 
+function post(url, payload) {
+  return request(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
 export const Api = {
   getState: () => request("/api/state"),
   getDeliverable: (path) =>
@@ -23,12 +31,25 @@ export const Api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ workspaceRoot })
     }),
-  newProject: (path) =>
+  newProject: (path, clientFolder) =>
     request("/api/projects/new", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path })
+      body: JSON.stringify({ path, clientFolder })
     }),
+  // Client sources (bootstrap from a rich client folder)
+  getSources: () => request("/api/sources"),
+  ingestSources: (folder) => post("/api/sources/ingest", { folder }),
+  updateSource: (id, patch) => post("/api/sources/update", { id, patch }),
+  validateSources: () => post("/api/sources/validate", {}),
+  startSourceMap: () => post("/api/sources/map", {}),
+  startCoverage: () => post("/api/sources/coverage", {}),
+  // PowerPoint / Word supports
+  getSupports: () => request("/api/supports"),
+  createSupport: (phaseId, format, audience) => post("/api/supports", { phaseId, format, audience }),
+  rerenderSupport: (id) => post("/api/supports/render", { id }),
+  uploadSupportTemplate: (format, filename, contentBase64) => post("/api/settings/support-template", { format, filename, contentBase64 }),
+  removeSupportTemplate: (format) => post("/api/settings/support-template", { format, remove: true }),
   pickFolder: (initial) =>
     request("/api/pick-folder", {
       method: "POST",

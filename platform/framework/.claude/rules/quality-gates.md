@@ -11,7 +11,7 @@ not informal opinions.
 | G1 | Vision Ready | Sponsor + Discovery Reviewer | UX / UI / Domain Architecture |
 | G2 | Domain, UX And UI Ready | UX + UI Designer + Domain Architect + Discovery Reviewer | Technical architecture |
 | G3 | Architecture And Security Ready | Solution Architect + Security Architect + Architecture Reviewer | Backlog commitment |
-| G4 | Story Ready | PO + Spec Reviewer | Development |
+| G4 | Story Ready | PO + Chef de projet + Spec Reviewer | Development |
 | G5 | Implementation Done | Developer + Code/Spec Review | QA and AppSec |
 | G6 | Verification Done | QA + Test Reviewer + AppSec Reviewer | Release decision |
 | G7 | Release Decision | Release Judge + DevOps | Deployment / feedback loop |
@@ -28,6 +28,16 @@ A User Story is ready only when:
 - UX, UI, and architecture links are present when the US changes user-facing behavior or technical structure.
 - **Back and Front portions are explicitly delimited.** A user-facing story either splits its work into a `Back` part and a `Front` part (screens + states), or is tagged `Back-only` / `Front-only`. Each concerned screen under `02-ui/ecrans/` is linked. No user-facing story is `Prête` with an implicit or missing front scope.
 - Test strategy can be derived without guessing.
+
+## Delivery Planning (G4)
+
+G4 also requires the delivery plan from `@chef-de-projet`:
+
+- `/livrables/05-backlog/planning.md` and `planning.json` exist and agree with each other.
+- Every story of the MVP scope is estimated in person-days, with a confidence level.
+- Transverse load, team, sprints, and milestones are stated; sprint load fits team capacity.
+- Planning assumptions (team size, start date, sprint length, target dates) are validated by a
+  human or listed as open decisions.
 
 ## Definition Of Done For User Stories
 

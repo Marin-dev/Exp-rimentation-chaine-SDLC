@@ -57,6 +57,7 @@ import DocTypeTabs from "../components/DocTypeTabs.jsx";
 import RunNextSteps from "../components/RunNextSteps.jsx";
 import ParallelRunView from "../components/ParallelRunView.jsx";
 import PhaseInputs from "../components/PhaseInputs.jsx";
+import SupportsPanel from "../components/SupportsPanel.jsx";
 import UsReport from "../components/UsReport.jsx";
 
 function ItemRow({ d, onOpen, selectable, selected, onToggle }) {
@@ -120,6 +121,7 @@ export default function PhaseScreen({
   onLaunchParallel,
   onLaunchDevBatches,
   onLaunchReview,
+  onGenerateSupport,
   onRemediateRisks,
   onNavigate,
   onGoPhase,
@@ -421,6 +423,9 @@ export default function PhaseScreen({
 
       {/* Documents d'entrée (sources fournies par l'humain) */}
       <PhaseInputs phase={phase} onStateChange={onStateChange} />
+
+      {/* Supports PowerPoint / Word du projet jusqu'à cette étape */}
+      <SupportsPanel phase={phase} busy={Boolean(activeRun)} refreshKey={activeRun ? activeRun.id : "idle"} onGenerate={(format) => onGenerateSupport(phaseId, format)} />
 
       {/* À traiter */}
       {pending.length > 0 ? (

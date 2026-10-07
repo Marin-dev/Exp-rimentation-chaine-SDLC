@@ -16,6 +16,10 @@ import { executeOrchestratorAction, ingestOrchestratorActionsAsTasks, applyOrche
 import { buildOrchestratorSnapshot } from "../services/orchestrator-snapshot.js";
 import { startAutopilot, stopAutopilot, getAutopilotStatus, answerEscalation } from "../services/autopilot.js";
 import { scanIntake } from "../services/intake.js";
+import { ingestClientFolder, readSourcesIndex } from "../services/source-ingest.js";
+import { sourcesOverview, ingestSourceMap, updateSource, validateSources } from "../services/source-map.js";
+import { buildSourceMapPrompt, buildCoveragePrompt } from "../services/source-prompts.js";
+import { listSupports, createSupport, buildSupportPrompt, finalizeSupport, supportFilePath, exportMarkdownDocx, saveTemplate, FORMATS } from "../services/supports.js";
 import { saveUpload } from "../services/uploads.js";
 import { readTextSafe } from "../services/fs-utils.js";
 import { addFeedback } from "../services/feedback-store.js";
@@ -42,7 +46,7 @@ const PHASE_AGENTS = {
   G1: "@sponsor",
   G2: "@ux + @architecte-metier + @ui-designer",
   G3: "@architecte-technique + @security-architect",
-  G4: "@po",
+  G4: "@po + @chef-de-projet",
   G5: "@developpeur",
   G6: "@qa + @appsec-reviewer",
   G6R: "@end-user",
@@ -56,6 +60,29 @@ function sendJson(res, status, payload) {
     "Cache-Control": "no-store"
   });
   res.end(body);
+}
+
+const DOWNLOAD_TYPES = {
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+};
+
+/** Questions, risks and tasks an agent raised during a G0-level run (sources, coverage). */
+function ingestG0Outputs(paths, run) {
+  const meta = { runId: run.id, phaseId: "G0", raisedBy: PHASE_AGENTS.G0 };
+  ingestRisks(paths, meta);
+  ingestTasks(paths, meta);
+  return ingestPendingInput(paths, meta);
+}
+
+function sendFile(res, buffer, filename) {
+  res.writeHead(200, {
+    "Content-Type": DOWNLOAD_TYPES[path.extname(filename).toLowerCase()] || "application/octet-stream",
+    "Content-Disposition": `attachment; filename="${filename.replace(/[^ -~]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    "Content-Length": buffer.length,
+    "Cache-Control": "no-store"
+  });
+  res.end(buffer);
 }
 
 function readBody(req) {
@@ -118,8 +145,14 @@ export async function handleApi(req, res, url) {
         return true;
       }
       saveConfig({ workspaceRoot: result.path });
+      // Optional: bootstrap from a rich client folder (copy + conversion, no AI yet).
+      let sources = null;
+      const clientFolder = String(body.clientFolder || "").trim();
+      if (clientFolder) {
+        sources = await ingestClientFolder(createWorkspacePaths(result.path), clientFolder);
+      }
       const state = await buildProjectState(loadConfig());
-      sendJson(res, 200, { ok: true, path: result.path, state });
+      sendJson(res, 200, { ok: true, path: result.path, sources, state });
       return true;
     }
 
@@ -739,19 +772,175 @@ export async function handleApi(req, res, url) {
       return true;
     }
 
+    // ---- PowerPoint / Word supports ----
+    if (pathname === "/api/supports" && req.method === "GET") {
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      sendJson(res, 200, { ok: true, supports: listSupports(paths), formats: FORMATS, templates: config.supportTemplates || {} });
+      return true;
+    }
+    if (pathname === "/api/supports" && req.method === "POST") {
+      const body = await readBody(req);
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      const phaseId = String(body.phaseId || "").trim();
+      const format = String(body.format || "").trim();
+      const created = createSupport(paths, { phaseId, format });
+      if (!created.ok) {
+        sendJson(res, 400, created);
+        return true;
+      }
+      const support = created.support;
+      const label = `${phaseId} · Support ${FORMATS[format]}`;
+      const runId = startRun(config, {
+        label,
+        kind: "support",
+        phaseId,
+        agent: "@project-bootstrapper",
+        prompt: buildSupportPrompt({ phaseId, format, outlineRel: support.outline, audience: String(body.audience || "").trim() }),
+        cwd: paths.workspaceRoot,
+        onDone: (run) => finalizeSupport(paths, loadConfig(), support.id, run.status === "done")
+      });
+      sendJson(res, 200, { ok: true, runId, label, support });
+      return true;
+    }
+    // Re-render an existing outline (e.g. after a template change or a server restart mid-run).
+    if (pathname === "/api/supports/render" && req.method === "POST") {
+      const body = await readBody(req);
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      const support = await finalizeSupport(paths, config, String(body.id || ""), true);
+      sendJson(res, support ? 200 : 404, support ? { ok: true, support } : { ok: false, error: "Support introuvable." });
+      return true;
+    }
+    if (pathname === "/api/supports/download" && req.method === "GET") {
+      const paths = createWorkspacePaths(loadConfig().workspaceRoot);
+      const file = supportFilePath(paths, String(url.searchParams.get("id") || ""));
+      if (!file) {
+        sendJson(res, 404, { ok: false, error: "Fichier introuvable." });
+        return true;
+      }
+      sendFile(res, fs.readFileSync(file), path.basename(file));
+      return true;
+    }
+    if (pathname === "/api/export/docx" && req.method === "GET") {
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      const result = await exportMarkdownDocx(paths, config, url.searchParams.get("path"));
+      if (!result.ok) {
+        sendJson(res, 400, result);
+        return true;
+      }
+      sendFile(res, result.buffer, result.filename);
+      return true;
+    }
+    if (pathname === "/api/settings/support-template" && req.method === "POST") {
+      const body = await readBody(req);
+      const config = loadConfig();
+      const format = String(body.format || "");
+      const templates = { pptx: null, docx: null, ...(config.supportTemplates || {}) };
+      if (body.remove) {
+        templates[format] = null;
+      } else {
+        const saved = saveTemplate(format, body.filename, body.contentBase64);
+        if (!saved.ok) {
+          sendJson(res, 400, saved);
+          return true;
+        }
+        templates[format] = saved.value;
+      }
+      saveConfig({ supportTemplates: templates });
+      sendJson(res, 200, { ok: true, state: await buildProjectState(loadConfig()) });
+      return true;
+    }
+
+    // ---- Client sources (bootstrap from a rich client folder) ----
+    if (pathname === "/api/sources" && req.method === "GET") {
+      const paths = createWorkspacePaths(loadConfig().workspaceRoot);
+      sendJson(res, 200, sourcesOverview(paths));
+      return true;
+    }
+    if (pathname === "/api/sources/ingest" && req.method === "POST") {
+      const body = await readBody(req);
+      const paths = createWorkspacePaths(loadConfig().workspaceRoot);
+      const result = await ingestClientFolder(paths, body.folder);
+      sendJson(res, result.ok ? 200 : 400, result.ok ? { ...result, overview: sourcesOverview(paths) } : result);
+      return true;
+    }
+    if (pathname === "/api/sources/update" && req.method === "POST") {
+      const body = await readBody(req);
+      const paths = createWorkspacePaths(loadConfig().workspaceRoot);
+      const result = updateSource(paths, String(body.id || ""), body.patch || {});
+      sendJson(res, result.ok ? 200 : 400, result.ok ? { ok: true, overview: sourcesOverview(paths) } : result);
+      return true;
+    }
+    if (pathname === "/api/sources/validate" && req.method === "POST") {
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      const result = validateSources(paths);
+      sendJson(res, result.ok ? 200 : 400, result.ok ? { ...result, overview: sourcesOverview(paths), state: await buildProjectState(config) } : result);
+      return true;
+    }
+    // Cartography run: @project-bootstrapper classifies every ingested document.
+    if (pathname === "/api/sources/map" && req.method === "POST") {
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      if (!readSourcesIndex(paths)) {
+        sendJson(res, 400, { ok: false, error: "Aucun dossier client ingéré." });
+        return true;
+      }
+      const runId = startRun(config, {
+        label: "G0 · Cartographie des sources client",
+        kind: "source-map",
+        phaseId: "G0",
+        agent: PHASE_AGENTS.G0,
+        prompt: buildSourceMapPrompt(),
+        cwd: paths.workspaceRoot,
+        onDone: (run) => {
+          ingestSourceMap(paths);
+          return ingestG0Outputs(paths, run);
+        }
+      });
+      sendJson(res, 200, { ok: true, runId });
+      return true;
+    }
+    // Coverage run: what the validated sources cover vs. what G1..G4 expect + client questionnaire.
+    if (pathname === "/api/sources/coverage" && req.method === "POST") {
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      const index = readSourcesIndex(paths);
+      if (!index || !index.validatedAt) {
+        sendJson(res, 400, { ok: false, error: "Validez d'abord l'affectation des sources." });
+        return true;
+      }
+      const runId = startRun(config, {
+        label: "G0 · Couverture des sources et questionnaire client",
+        kind: "coverage",
+        phaseId: "G0",
+        agent: PHASE_AGENTS.G0,
+        prompt: buildCoveragePrompt(),
+        cwd: paths.workspaceRoot,
+        onDone: (run) => ingestG0Outputs(paths, run)
+      });
+      sendJson(res, 200, { ok: true, runId });
+      return true;
+    }
+
     // Start the G0 run: read intake, structure needs, raise questions.
     if (pathname === "/api/runs/g0" && req.method === "POST") {
       const body = await readBody(req);
       const config = loadConfig();
       const paths = createWorkspacePaths(config.workspaceRoot);
-      const intakePath = String(body.intakePath || "").trim();
+      const sourcesIndex = readSourcesIndex(paths);
+      const hasSources = Boolean(sourcesIndex && sourcesIndex.validatedAt);
+      const intakePath = String(body.intakePath || "").trim() || (sourcesIndex ? sourcesIndex.sourceFolder : "");
       const hasAnswers = fs.existsSync(paths.answersFile);
       const runId = startRun(config, {
         label: "G0 · Structuration du besoin",
         kind: "g0",
         phaseId: "G0",
         agent: PHASE_AGENTS.G0,
-        prompt: buildG0Prompt({ intakePath, hasAnswers }) + libraryPolicyText(config),
+        prompt: buildG0Prompt({ intakePath, hasAnswers, hasSources }) + libraryPolicyText(config),
         cwd: paths.workspaceRoot,
         onDone: (run) =>
           ingestPendingInput(paths, { runId: run.id, phaseId: "G0", raisedBy: PHASE_AGENTS.G0 })

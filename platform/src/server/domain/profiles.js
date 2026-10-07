@@ -10,7 +10,7 @@ export const PROFILES = [
     short: "Pilote",
     color: "#1f2937",
     description: "Pilote la chaîne de bout en bout, voit toutes les décisions.",
-    agents: ["@project-bootstrapper"],
+    agents: ["@project-bootstrapper", "@chef-de-projet"],
     seesAll: true
   },
   {

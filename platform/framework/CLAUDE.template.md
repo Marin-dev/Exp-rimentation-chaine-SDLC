@@ -37,6 +37,7 @@ et suit runs, gates, décisions et coûts. Ce fichier est chargé par **chaque**
 | Threat model, exigences sécurité, classification data | `@security-architect` |
 | Revue indépendante architecture domaine/technique | `@architecture-reviewer` |
 | Epics, Features, User Stories, Definition of Ready | `@po` |
+| Estimation en jours-homme, équipe, sprints, jalons, planning | `@chef-de-projet` |
 | Ambiguïté ou readiness d'une spec (G4) | `@spec-reviewer` |
 | Implémentation d'une US en vertical slice | `@developpeur` |
 | Qualité du code, conformité au scope | `@code-quality-reviewer` |

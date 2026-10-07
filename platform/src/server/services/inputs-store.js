@@ -69,6 +69,52 @@ export function addInput(paths, { phaseId, filename, contentBase64, description 
   return { ok: true, id: entry.id };
 }
 
+/**
+ * Register a document that ALREADY lives in the workspace (a normalized client source)
+ * as an input of a phase, without copying it. Idempotent per (sourceId, phaseId).
+ */
+export function addInputRef(paths, { phaseId, relPath, description, sourceId }) {
+  const data = load(paths);
+  const existing = data.inputs.find((i) => i.origin === "source" && i.sourceId === sourceId && i.phaseId === phaseId);
+  if (existing) {
+    const changed = existing.path !== relPath;
+    existing.path = relPath;
+    existing.description = String(description || "").trim();
+    // A new version of the source must be read again by the phase agents.
+    if (changed) { existing.status = "pending"; existing.consideredAt = null; }
+    save(paths, data);
+    return { ok: true, id: existing.id };
+  }
+  const entry = {
+    id: `IN-${Date.now()}-${data.inputs.length + 1}`,
+    phaseId,
+    name: relPath.split("/").pop(),
+    path: relPath,
+    description: String(description || "").trim(),
+    origin: "source",
+    sourceId,
+    status: "pending",
+    addedAt: new Date().toISOString(),
+    consideredAt: null
+  };
+  data.inputs.push(entry);
+  save(paths, data);
+  return { ok: true, id: entry.id };
+}
+
+/** Drop the source inputs of `sourceId` whose phase is not in `keepPhases` (re-routing). */
+export function pruneSourceInputs(paths, sourceId, keepPhases) {
+  const data = load(paths);
+  const before = data.inputs.length;
+  data.inputs = data.inputs.filter((i) => !(i.origin === "source" && i.sourceId === sourceId && !keepPhases.includes(i.phaseId)));
+  if (data.inputs.length !== before) save(paths, data);
+}
+
+/** All client-source inputs routed to a phase, whatever their status. */
+export function sourceInputsForPhase(paths, phaseId) {
+  return load(paths).inputs.filter((i) => i.origin === "source" && i.phaseId === phaseId);
+}
+
 export function setInputStatus(paths, id, status) {
   const data = load(paths);
   const item = data.inputs.find((i) => i.id === id);
@@ -83,9 +129,12 @@ export function removeInput(paths, id) {
   const data = load(paths);
   const item = data.inputs.find((i) => i.id === id);
   if (!item) return { ok: false, error: "Document introuvable." };
-  try {
-    fs.rmSync(path.resolve(paths.workspaceRoot, item.path), { force: true });
-  } catch {}
+  // A client source is only referenced, never owned: removing the input keeps the file.
+  if (item.origin !== "source") {
+    try {
+      fs.rmSync(path.resolve(paths.workspaceRoot, item.path), { force: true });
+    } catch {}
+  }
   data.inputs = data.inputs.filter((i) => i.id !== id);
   save(paths, data);
   return { ok: true };

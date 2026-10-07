@@ -9,6 +9,8 @@ export const platformRoot = path.resolve(serverConfigDir, "..", "..", "..");
 export const distDir = path.join(platformRoot, "dist");
 export const appStateDir = path.join(platformRoot, ".state");
 export const configPath = path.join(appStateDir, "config.json");
+// App-level PowerPoint / Word templates used as style examples for generated supports.
+export const templatesDir = path.join(appStateDir, "templates");
 
 // App-bundled framework template. Mirrors a workspace layout (CLAUDE.template.md → CLAUDE.md, + .claude/…)
 // so createWorkspacePaths(frameworkRoot) yields its agents/skills/mcp paths directly.
@@ -58,6 +60,21 @@ export function createWorkspacePaths(workspaceRootInput = defaultWorkspaceRoot) 
     // Domain model: BC names (headings) and the cross-BC dependency order for G5 dev waves.
     boundedContextsFile: path.join(livrablesDir, "03-architecture-metier", "bounded-contexts.md"),
     devWavesFile: path.join(livrablesDir, "03-architecture-metier", "dev-waves.json"),
+    // Client source documents (bootstrap from a rich client folder). Originals are an
+    // immutable copy; normalises/ holds the Markdown conversions agents actually read.
+    sourcesDir: path.join(livrablesDir, "_sources"),
+    sourcesOriginalsDir: path.join(livrablesDir, "_sources", "originaux"),
+    sourcesNormalizedDir: path.join(livrablesDir, "_sources", "normalises"),
+    sourcesByPhaseDir: path.join(livrablesDir, "_sources", "par-etape"),
+    sourcesIndexFile: path.join(livrablesDir, "_sources", "sources.json"),
+    cartographyFile: path.join(livrablesDir, "00-contexte", "cartographie-sources.md"),
+    coverageReportFile: path.join(livrablesDir, "00-contexte", "couverture-sources.md"),
+    questionnaireFile: path.join(livrablesDir, "00-contexte", "questionnaire-client.md"),
+    // Delivery plan (G4, @chef-de-projet): human-readable + machine-readable for supports.
+    planningFile: path.join(livrablesDir, "05-backlog", "planning.md"),
+    planningJsonFile: path.join(livrablesDir, "05-backlog", "planning.json"),
+    // Generated PowerPoint / Word supports, one folder per generation.
+    supportsDir: path.join(livrablesDir, "_supports"),
     // Per-phase human-provided INPUT documents (sources the agents must consume).
     inputsDir: path.join(livrablesDir, "_inputs"),
     // AI agent I/O contract. These live UNDER /livrables (not .claude/) because
@@ -73,6 +90,9 @@ export function createWorkspacePaths(workspaceRootInput = defaultWorkspaceRoot) 
     orchestratorActionsFile: path.join(livrablesDir, "_governance", "agent-io", "orchestrator-actions.json"),
     // Agents create/update tasks (next-step actions routed to a profile) here.
     tasksInboxFile: path.join(livrablesDir, "_governance", "agent-io", "tasks.json"),
+    // The cartography agent classifies each client source here; the coverage agent reports gaps.
+    sourceMapFile: path.join(livrablesDir, "_governance", "agent-io", "source-map.json"),
+    coverageFile: path.join(livrablesDir, "_governance", "agent-io", "coverage.json"),
     uploadsDir: path.join(livrablesDir, "_governance", "agent-io", "uploads"),
     feedbackFile: path.join(livrablesDir, "_governance", "agent-io", "feedback.json")
   };

@@ -61,7 +61,19 @@ Détail du code (services, écrans, ajout d'endpoint ou d'écran) : `platform/RE
    propres fichiers agent-io. L'ordre des vagues vient de
    `livrables/03-architecture-metier/dev-waves.json` (produit par `@architecte-metier`) ;
    sans ce fichier, un BC par vague, par ordre d'id.
-9. **Au démarrage** (`server.js`) : les runs encore vivants sont ré-adoptés, l'ingestion
+9. **Amorçage depuis un dossier client** (`source-ingest.js`, `source-map.js`) : à la création
+   d'un projet (ou depuis Lancement), le dossier du client est copié et converti sous
+   `livrables/_sources/`. `@project-bootstrapper` cartographie chaque document (niveau, étapes,
+   fiabilité, contradictions), l'humain valide l'affectation, et chaque étape concernée reçoit un
+   brief `_sources/par-etape/<Gx>.md` qui bascule ses agents en **mode reprise** (transformer la
+   matière du client en citant les sources, poser des questions sur les manques). Une analyse de
+   couverture produit la matrice G1→G4 et un questionnaire client exportable en Word.
+10. **Planning** : `@chef-de-projet` produit à G4 `05-backlog/planning.md` + `planning.json`
+   (charge en jours-homme, équipe, sprints, jalons).
+11. **Supports** (`supports.js`, `support-render.js`) : depuis chaque étape, un agent rédige un plan
+   JSON consolidé de G0 à l'étape, rendu en PowerPoint ou Word avec le gabarit déposé dans les
+   Réglages (couleurs, polices, styles Word), sinon un gabarit neutre.
+12. **Au démarrage** (`server.js`) : les runs encore vivants sont ré-adoptés, l'ingestion
    des runs finis est rattrapée, et l'autopilote reprend s'il était actif.
 
 ## Lancer

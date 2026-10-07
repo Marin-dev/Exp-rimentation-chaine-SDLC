@@ -29,7 +29,10 @@ const KIND_LABELS = {
   resolution: "Résolution d'une décision (expert)",
   "risk-seed": "Amorçage des risques",
   "task-batch": "Traitement d'un lot de tâches",
-  "app-detect": "Détection du lancement du produit"
+  "app-detect": "Détection du lancement du produit",
+  "source-map": "Cartographie des sources client",
+  coverage: "Couverture des sources client",
+  support: "Support PowerPoint / Word"
 };
 
 function describe(rec, phaseTitle) {
@@ -61,6 +64,12 @@ function describe(rec, phaseTitle) {
       return `Traitement d'un lot de tâches par ${who}.`;
     case "app-detect":
       return "Détection de la configuration de lancement du produit livré.";
+    case "source-map":
+      return "Classement des documents du client par niveau et par étape, repérage des contradictions.";
+    case "coverage":
+      return "Mesure de ce que couvrent les documents du client et préparation du questionnaire client.";
+    case "support":
+      return `Rédaction d'un support de synthèse du projet jusqu'à « ${phaseTitle} ».`;
     default:
       return rec.label || "Action d'agent.";
   }

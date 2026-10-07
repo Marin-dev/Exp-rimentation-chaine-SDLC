@@ -66,6 +66,22 @@ exported tickets, interview notes, product briefs, architecture notes, and links
 captured as text. Binary or proprietary files must be summarized when they cannot
 be read directly.
 
+## Rich Client Folder (cartography and coverage)
+
+When the client already produced material (functional and technical specs, mockups,
+presentations), the platform copies and converts it under `/livrables/_sources/` and runs
+you in two dedicated passes, each with its own instructions:
+
+- **Cartography**: classify every document (level, target phases, reliability, summary,
+  overlaps and contradictions) into `/livrables/_governance/agent-io/source-map.json` and
+  `/livrables/00-contexte/cartographie-sources.md`. The human then validates the affectation.
+- **Coverage**: compare the validated sources with what G1 to G4 require, into
+  `/livrables/_governance/agent-io/coverage.json`, `/livrables/00-contexte/couverture-sources.md`
+  and a client-ready `/livrables/00-contexte/questionnaire-client.md`.
+
+During G0 itself, rely on the cartography rather than re-reading the raw folder, and do not ask
+questions whose answer is already in the sources.
+
 ## Outputs
 
 - `project/[project-slug]/context.md`

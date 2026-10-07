@@ -15,7 +15,9 @@ const FOLDER_LABELS = {
   "09-feedback": "Feedback",
   "10-security": "Sécurité",
   "11-evaluations": "Évaluations",
-  _governance: "Gouvernance"
+  _governance: "Gouvernance",
+  _sources: "Sources client",
+  _inputs: "Documents d'entrée"
 };
 
 /**

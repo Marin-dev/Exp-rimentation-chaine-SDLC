@@ -1,4 +1,5 @@
 import { PROFILES } from "../domain/profiles.js";
+import { repriseHint, g0SourcesBlock } from "./source-prompts.js";
 
 const PROFILE_IDS = PROFILES.map((p) => p.id).join(", ");
 
@@ -12,7 +13,7 @@ Quand plusieurs sous-tâches sont INDÉPENDANTES (ex. plusieurs User Stories, pl
  * It tells the agent how to hand questions/decisions back to humans
  * and how to read the answers so it can resume.
  */
-function contractBlock(pendingFile = "livrables/_governance/agent-io/pending-input.json") {
+export function contractBlock(pendingFile = "livrables/_governance/agent-io/pending-input.json") {
   return `--- PROTOCOLE PLATEFORME SDLC STUDIO (obligatoire) ---
 Tu travailles pour une plateforme qui montre ton avancement à des profils humains, souvent non techniques.
 
@@ -60,13 +61,13 @@ Avant d'introduire une NOUVELLE librairie ou dépendance qui n'est pas déjà ap
 --- FIN POLITIQUE ---\n`;
 }
 
-export function buildG0Prompt({ intakePath, hasAnswers }) {
+export function buildG0Prompt({ intakePath, hasAnswers, hasSources }) {
   return `Tu agis comme @project-bootstrapper, en suivant CLAUDE.md, .claude/rules/ et .claude/agents/project-bootstrapper.md.
 
 Objectif de l'étape G0 (Lancement) : à partir du besoin client fourni, STRUCTURER les besoins clés du projet et préparer le contexte projet.
 
 Dossier d'intake (documents du besoin client) : ${intakePath || "(à confirmer)"}
-
+${hasSources ? g0SourcesBlock() : ""}
 Travail attendu :
 1. Lis les documents d'intake disponibles.
 2. Structure les besoins clés par dimension : besoin métier / valeur, utilisateurs et usages, processus, données, systèmes existants, contraintes, orientations d'architecture, et sécurité.
@@ -100,7 +101,7 @@ ${hasAnswers ? "3. Lis les réponses humaines dans livrables/_governance/agent-i
 
 Livrables attendus pour cette étape :
 ${produces || "- (voir les fichiers d'agents et conventions-livrables.md)"}
-${inputsBlock(inputs)}
+${inputsBlock(inputs)}${repriseHint(phase.id)}
 Validation de l'étape :
 - Quand l'étape est complète selon .claude/rules/quality-gates.md, écris ou mets à jour /livrables/_governance/gates/${phase.gateFile || phase.id}.md avec **Status**: PASS (ou FAIL si un élément structurant bloque, ou PASS_WITH_RISK si un risque est explicitement accepté et possédé).
 - Pour toute imprécision, information manquante ou choix structurant qui dépasse les preuves disponibles, pose une question ou une décision via le protocole, routée vers le bon profil.
@@ -126,7 +127,7 @@ Avant de produire : lis le profil projet (project/...) et les livrables des éta
 
 Livrables attendus (uniquement les tiens) :
 ${produces || "- (voir ton fichier d'agent et conventions-livrables.md)"}
-${inputsBlock(inputs)}
+${inputsBlock(inputs)}${repriseHint(phase.id)}
 
 Pour toute imprécision ou choix structurant, pose une question/décision via le protocole (dans TON fichier ci-dessous). N'écris PAS le fichier de gate (la revue de l'étape s'en charge après convergence).
 ${PARALLEL_HINT}
@@ -327,7 +328,7 @@ ${intro}
 5. Réévalue et METS À JOUR le gate \`${gateRel}\` :
 ${reeval}
 6. Consigne les corrections dans les livrables de l'étape (et le changelog des actions agents si pertinent).
-
+${repriseHint(phase.id)}
 ${contractBlock()}${riskRegisterProtocolText()}${taskProtocolText()}`;
 }
 
@@ -524,7 +525,7 @@ L'orchestrateur — sur confirmation explicite de l'humain — te confie cette t
 ${instruction || "(voir la conversation)"}
 
 Avant d'agir : lis project/PROJECT.md, les règles (.claude/rules/, notamment quality-gates.md et ui-frontend-quality.md), et les livrables utiles (le plan et les User Stories concernées, le design-system et les écrans sous 02-ui/, l'état d'infrastructure locale).
-Respecte la Definition of Done applicable : pour une User Story user-facing, l'écran doit être RÉELLEMENT monté et câblé (états Chargement / Vide / Erreur), avec une preuve L3/UI exécutée contre le back local. Ne réduis pas le périmètre demandé sans arbitrage humain.
+${repriseHint(phaseId)}Respecte la Definition of Done applicable : pour une User Story user-facing, l'écran doit être RÉELLEMENT monté et câblé (états Chargement / Vide / Erreur), avec une preuve L3/UI exécutée contre le back local. Ne réduis pas le périmètre demandé sans arbitrage humain.
 ${contractBlock(pendingFileRel)}${riskRegisterProtocolText(risksFileRel)}${taskProtocolText(tasksFileRel)}`;
 }
 

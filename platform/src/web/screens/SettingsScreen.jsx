@@ -18,6 +18,7 @@ import {
 import { Api } from "../api.js";
 import { Card, EmptyState, useEscToClose } from "../components/ui.jsx";
 import FolderInput from "../components/FolderInput.jsx";
+import SupportTemplatesCard from "../components/SupportTemplatesCard.jsx";
 
 function LibraryPolicyCard({ state, onStateChange }) {
   const current = (state.config && state.config.policies && state.config.policies.libraries) || { mode: "ask", allowed: [] };
@@ -562,6 +563,7 @@ export default function SettingsScreen({ state, onStateChange }) {
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [resourceMsg, setResourceMsg] = useState(null);
   const [newPath, setNewPath] = useState("");
+  const [newClientFolder, setNewClientFolder] = useState("");
   const [newBusy, setNewBusy] = useState(false);
   const [newMsg, setNewMsg] = useState(null);
   const [newErr, setNewErr] = useState(null);
@@ -571,10 +573,15 @@ export default function SettingsScreen({ state, onStateChange }) {
     setNewMsg(null);
     setNewErr(null);
     try {
-      const res = await Api.newProject(newPath.trim());
+      const res = await Api.newProject(newPath.trim(), newClientFolder.trim());
       onStateChange(res.state);
-      setNewMsg(`Projet créé : ${res.path}. Dossier de travail basculé dessus.`);
+      const src = res.sources;
+      const srcMsg = !src ? "" : src.ok
+        ? ` ${src.stats.total} document(s) client importé(s) : poursuivez dans Lancement › Sources client (cartographie).`
+        : ` Import du dossier client impossible : ${src.error}`;
+      setNewMsg(`Projet créé : ${res.path}. Dossier de travail basculé dessus.${srcMsg}`);
       setNewPath("");
+      setNewClientFolder("");
       setWorkspace(res.state.config.workspaceRoot);
     } catch (e) {
       setNewErr(e.message);
@@ -636,6 +643,12 @@ export default function SettingsScreen({ state, onStateChange }) {
           skills, MCP) et une arborescence /livrables vide, puis bascule le dossier de travail dessus.
         </p>
         <FolderInput value={newPath} onChange={setNewPath} placeholder="C:\chemin\vers\le\nouveau-projet" />
+        <label className="block text-[13px] font-semibold mt-3 mb-1">Dossier client (optionnel)</label>
+        <p className="text-ey-gray01 text-[12.5px] mt-0 mb-2">
+          Si le client a déjà produit des documents (specs, maquettes, présentations…), indiquez leur dossier :
+          ils seront copiés et convertis dans le projet, prêts à être cartographiés.
+        </p>
+        <FolderInput value={newClientFolder} onChange={setNewClientFolder} placeholder="C:\chemin\vers\le\dossier-client" />
         <button className="btn btn-primary gap-1.5 mt-3" onClick={createProject} disabled={newBusy || !newPath.trim()}>
           <Rocket size={16} /> {newBusy ? "Création…" : "Créer le projet"}
         </button>
@@ -648,6 +661,9 @@ export default function SettingsScreen({ state, onStateChange }) {
 
       {/* Execution / permission mode */}
       <ExecutionModeCard state={state} onStateChange={onStateChange} />
+
+      {/* PowerPoint / Word templates for generated supports */}
+      <SupportTemplatesCard state={state} onStateChange={onStateChange} />
 
       {/* Library policy */}
       <LibraryPolicyCard state={state} onStateChange={onStateChange} />

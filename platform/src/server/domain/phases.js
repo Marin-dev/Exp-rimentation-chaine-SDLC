@@ -73,12 +73,13 @@ export const PHASES = [
     folders: ["05-backlog"],
     ownerProfiles: ["po"],
     human: "Relire les User Stories, les critères d'acceptation et les priorités.",
-    agents: "@po puis @spec-reviewer",
+    agents: "@po puis @chef-de-projet puis @spec-reviewer",
     gateFile: "G4-story-ready",
-    goal: "Produire Epics, Features et User Stories priorisées, testables et tracées, prêtes au développement (Definition of Ready).",
+    goal: "Produire Epics, Features et User Stories priorisées, testables et tracées, prêtes au développement (Definition of Ready), puis le planning de réalisation (charge en jours-homme, équipe, sprints, jalons).",
     produces: [
       "/livrables/05-backlog/epics.md, features.md",
-      "/livrables/05-backlog/user-stories/US-[NNN]-[slug].md"
+      "/livrables/05-backlog/user-stories/US-[NNN]-[slug].md",
+      "/livrables/05-backlog/planning.md et planning.json (@chef-de-projet)"
     ]
   },
   {
@@ -154,7 +155,7 @@ export const PRODUCERS = {
   G1: "@sponsor",
   G2: "@ux, @architecte-metier, @ui-designer",
   G3: "@architecte-technique, @security-architect",
-  G4: "@po",
+  G4: "@po, @chef-de-projet",
   G5: "@developpeur",
   G6: "@qa",
   G6R: "@end-user",

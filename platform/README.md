@@ -202,6 +202,11 @@ if (pathname === "/api/mon-truc" && req.method === "GET") {
 | `audit-decisions.js` | Contrôle de cohérence des décisions déjà répondues ; rouvre celles incohérentes ou non documentées. |
 | `risks-store.js` / `tasks-store.js` | Registres risques et tâches (`project-state.json` + miroir lisible sous `_governance/`). Tâche `proposed` = candidate non actionnable. |
 | `coordination.js` | Convergence : un gate en PASS propre clôt les tâches encore ouvertes de sa phase. |
+| `source-ingest.js` | Amorçage depuis un dossier client : copie intacte (`_sources/originaux/`), conversion Word/PowerPoint/Excel en Markdown avec images extraites, `.fig` lu au mieux (miniature + images), empreintes pour repérer nouveau / modifié / retiré. Index `_sources/sources.json`. |
+| `source-map.js` | Fusion de la cartographie de l'agent, corrections humaines (étapes, niveau, exclusion, référence), validation : routage vers les `_inputs` des étapes + briefs `_sources/par-etape/<Gx>.md` (mode reprise). |
+| `source-prompts.js` | Prompts cartographie, couverture + questionnaire client, et bloc « mode reprise » injecté dans les prompts d'étape. |
+| `support-render.js` | Rendu déterministe PowerPoint (`pptxgenjs`) / Word (`docx`) d'un plan JSON : couverture, sommaire, indicateurs, tableaux paginés, images, calendrier des sprints depuis `planning.json`. Lit couleurs/polices du gabarit, et les styles pour Word. |
+| `supports.js` | Génération d'un support depuis une étape (run agent → `outline.json` → rendu), index `_supports/supports.json`, export Word direct d'un livrable Markdown, gabarits (`.state/templates/`). |
 | `dev-batches.js` | G5 en vagues : US prêtes groupées par Bounded Context, lanes `@developpeur` parallèles. Ordre des BC lu dans `03-architecture-metier/dev-waves.json` (sinon un BC par vague), noms dans `bounded-contexts.md`. |
 
 ---
@@ -223,12 +228,12 @@ if (pathname === "/api/mon-truc" && req.method === "GET") {
 | `PipelineScreen` | Liste G0–G7 (ouvre une phase). |
 | `ActivityScreen` | **Journal d'activité** : Chronologie (agents + ce qu'ils ont fait) & Par étape/gate. |
 | `CostScreen` | BI coûts/tokens (barres + 2 donuts + éditeur de tarifs). |
-| `LaunchScreen` | G0 (intake) + soumission d'un **nouveau besoin métier**. |
+| `LaunchScreen` | Sources client (import, cartographie, affectation, couverture, questionnaire) + G0 (intake) + **nouveau besoin métier**. |
 | `PhaseScreen` | Une étape : statut, inputs, à-traiter (bulk), livrables (onglets), revue, chat/consignes, console(s) run, prochaines actions. |
 | `DocumentsScreen` | Livrables par phase → par type, viewer plein écran + feedback. |
 | `LaunchAppScreen` | Lancer le produit développé (back/front) en local. |
 | `GitScreen` | init/commit/push/pull/remote/branches/historique + publication GitHub. |
-| `SettingsScreen` | Workspace, nouveau projet, politique librairies, autopilote, agents/skills/MCP. |
+| `SettingsScreen` | Workspace, nouveau projet (avec dossier client optionnel), gabarits des supports, politique librairies, autopilote, agents/skills/MCP. |
 | `OrchestratorScreen` | Chat avec l'orchestrateur (actions à confirmer) + panneau autopilote/copilote et escalades. |
 | `TasksScreen` | Registre des tâches par profil (candidates, à faire, en cours). |
 | `RisksScreen` | Registre des risques. |
@@ -294,6 +299,8 @@ Déclencher une revue **@agent-security-guard** (règle du cadre). L'applicatif 
 - [x] **M4** Exécution Claude live (SSE) + intake/G0 + reprise.
 - [x] Extensions livrées : coûts/BI, inputs par phase, exécution parallèle, publication
       GitHub, scaffolding nouveau projet, sélecteur de dossier natif, **journal d'activité**.
+- [x] Amorçage depuis un dossier client riche (sources, cartographie, mode reprise, couverture,
+      questionnaire), planning `@chef-de-projet` à G4, supports PowerPoint / Word par étape.
 - [x] Orchestrateur (chat), registres risques/tâches, convergence par gate, dev G5 en vagues
       par Bounded Context, autopilote / copilote.
 - [ ] **M5** Contrat de sortie structuré des agents (durcissement).

@@ -32,6 +32,7 @@ These conventions are project-agnostic and apply to every project using this arc
 ## File Naming
 
 - User Stories: `/livrables/05-backlog/user-stories/US-[NNN]-[slug].md`
+- Delivery plan: `/livrables/05-backlog/planning.md` + `planning.json`
 - Implementation notes: `/livrables/06-dev/vertical-slices/US-[NNN]-impl.md`
 - Test scenarios: `/livrables/07-tests/scenarios/US-[NNN]-scenarios.md`
 - Test reports: `/livrables/07-tests/scenarios/US-[NNN]-rapport-test.md`
@@ -114,3 +115,19 @@ project-intake/
 - `project/PROJECT.md`
 - `/livrables/00-contexte/intake-synthesis.md`
 - `/livrables/_governance/gates/G0-project-context-ready.md`
+
+## Client Sources
+
+When a project starts from a client's existing documents, the platform manages
+`/livrables/_sources/`:
+
+- `originaux/` — untouched copy of the client folder. Never edit it.
+- `normalises/` — readable conversions (Markdown with extracted images). PDF and images
+  are read directly from `originaux/`.
+- `sources.json` — index of every document (id `SRC-NNN`, conversion, classification).
+- `par-etape/<phase>.md` — documents validated for a phase. When it exists, that phase is
+  in reprise mode: transform the client's material, cite sources as `(source : SRC-NNN, §x)`,
+  and end each deliverable with a "Traçabilité des sources" section.
+
+Generated PowerPoint / Word supports are stored under `/livrables/_supports/`.
+

@@ -89,7 +89,8 @@ flowchart LR
   H --> I
   I --> J["G3 Architecture + Security"]
   J --> K["@po"]
-  K --> L["@spec-reviewer"]
+  K --> KP["@chef-de-projet"]
+  KP --> L["@spec-reviewer"]
   L --> M["G4 Story Ready"]
   M --> N["@developpeur"]
   N --> O["@code-quality-reviewer"]
