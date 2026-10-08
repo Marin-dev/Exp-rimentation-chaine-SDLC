@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Layers, CheckCircle2, Circle, RefreshCw, Loader2, ChevronDown, ChevronRight, GitMerge } from "lucide-react";
+import { Layers, CheckCircle2, Circle, RefreshCw, Loader2, ChevronDown, ChevronRight, GitMerge, FlaskConical } from "lucide-react";
 import { Api } from "../api.js";
 import { Card } from "./ui.jsx";
 
@@ -16,6 +16,16 @@ function UsRow({ u, done, onOpenDoc }) {
       <Icon size={15} className={done ? "text-[#168736] shrink-0" : "text-ey-gray02 shrink-0"} />
       <span className="text-[11px] font-mono text-ey-gray02 shrink-0">{u.id}</span>
       <span className="text-[13px] font-medium truncate flex-1">{u.title}</span>
+      {u.acceptance ? (
+        <span
+          className={`inline-flex items-center gap-1 text-[10.5px] font-semibold rounded px-1.5 py-0.5 shrink-0 ${
+            u.acceptance.startsWith("pass") ? "text-[#168736] bg-base-200" : "text-error bg-base-200"
+          } ${u.acceptanceFresh ? "" : "opacity-60"}`}
+          title={u.acceptanceFresh ? "Tests d'acceptation, dernière vérification" : "Tests d'acceptation, vérification périmée"}
+        >
+          <FlaskConical size={11} /> {u.acceptance.startsWith("pass") ? "OK" : u.acceptance === "missing" ? "sans test" : "échec"}
+        </span>
+      ) : null}
       {u.integrationBCs && u.integrationBCs.length ? (
         <GitMerge size={13} className="text-ey-gray02 shrink-0" title={`Intégration inter-BC : ${u.integrationBCs.join(", ")}`} />
       ) : null}

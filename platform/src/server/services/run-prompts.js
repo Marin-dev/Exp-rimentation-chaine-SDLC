@@ -1,4 +1,5 @@
 import { PROFILES } from "../domain/profiles.js";
+import { REVIEWERS } from "../domain/phases.js";
 import { repriseHint, g0SourcesBlock } from "./source-prompts.js";
 
 const PROFILE_IDS = PROFILES.map((p) => p.id).join(", ");
@@ -13,7 +14,12 @@ Quand plusieurs sous-tâches sont INDÉPENDANTES (ex. plusieurs User Stories, pl
  * It tells the agent how to hand questions/decisions back to humans
  * and how to read the answers so it can resume.
  */
-export function contractBlock(pendingFile = "livrables/_governance/agent-io/pending-input.json") {
+export function contractBlock(pendingFile = "livrables/_governance/agent-io/pending-input.json", { answersFile } = {}) {
+  // Answers are handed to ONE run through its own file (answers-<runId>.json): a shared
+  // answers.json leaked one agent's answers into every other concurrent run.
+  const answersLine = answersFile
+    ? `2) Les réponses humaines à tes questions sont dans \`${answersFile}\` (tableau de {id, ref, question, answer, note, documents}). Lis-le et appuie-toi dessus pour continuer SANS reposer les mêmes questions.`
+    : `2) Si des réponses humaines te sont destinées, le fichier exact t'est indiqué dans la consigne. N'en lis aucun autre : les fichiers \`answers-*.json\` du dossier agent-io appartiennent à d'autres agents.`;
   return `--- PROTOCOLE PLATEFORME SDLC STUDIO (obligatoire) ---
 Tu travailles pour une plateforme qui montre ton avancement à des profils humains, souvent non techniques.
 
@@ -37,8 +43,8 @@ Tu travailles pour une plateforme qui montre ton avancement à des profils humai
 - Choisis le "profile" le plus pertinent pour chaque item.
 - Si tu n'as besoin de rien d'humain, écris {"summary":"...","items":[]}.
 
-2) Les réponses humaines, quand elles existent, sont dans \`livrables/_governance/agent-io/answers.json\` (tableau de {id, ref, question, answer, note, documents}). Lis-le s'il existe et appuie-toi dessus pour continuer SANS reposer les mêmes questions. Si une réponse contient un tableau \`documents\` (chemins de fichiers uploadés par l'humain), OUVRE et LIS ces fichiers : ils contiennent l'information attendue. Extrais-en ce qui répond à la question et place-le au bon endroit dans les livrables. Si le document ne répond pas vraiment, repose une question précise via le protocole.
-   IMPORTANT — décisions déléguées : si une réponse vaut "DÉLÉGUÉ — fais au mieux", tu prends la décision toi-même selon le contexte et les bonnes pratiques, tu l'appliques, ET tu REPORTES ton choix dans \`livrables/_governance/agent-io/resolutions.json\` au format [{"id":"<l'id fourni dans answers.json>","decision":"ce que tu as décidé","rationale":"pourquoi"}], pour que l'humain puisse le voir et le corriger.
+${answersLine} Si une réponse contient un tableau \`documents\` (chemins de fichiers uploadés par l'humain), OUVRE et LIS ces fichiers : ils contiennent l'information attendue. Extrais-en ce qui répond à la question et place-le au bon endroit dans les livrables. Si le document ne répond pas vraiment, repose une question précise via le protocole.
+   IMPORTANT — décisions déléguées : si une réponse vaut "DÉLÉGUÉ — fais au mieux", tu prends la décision toi-même selon le contexte et les bonnes pratiques, tu l'appliques, ET tu REPORTES ton choix dans \`livrables/_governance/agent-io/resolutions.json\` au format [{"id":"<l'id fourni dans le fichier de réponses>","decision":"ce que tu as décidé","rationale":"pourquoi"}], pour que l'humain puisse le voir et le corriger.
 
 3) Si le fichier \`livrables/_governance/agent-io/feedback.json\` existe, il contient des retours humains sur des documents précis ([{doc, comment, by}]). LIS-le et corrige les documents concernés en conséquence avant de conclure.
 
@@ -57,11 +63,11 @@ Tu peux utiliser les librairies / dépendances que tu juges pertinentes, en rest
   const allowed = Array.isArray(p.allowed) ? p.allowed.filter(Boolean) : [];
   const allowedTxt = allowed.length ? ` Librairies déjà approuvées (utilisables librement) : ${allowed.join(", ")}.` : "";
   return `\n--- POLITIQUE LIBRAIRIES ---
-Avant d'introduire une NOUVELLE librairie ou dépendance qui n'est pas déjà approuvée, tu DOIS demander l'autorisation humaine via le protocole : crée une décision (type "decision", profil "architecte-technique") avec un champ "library" = nom exact de la librairie, un titre "Utiliser la librairie X ?", et les options [{"label":"Autoriser"},{"label":"Refuser"}]. N'installe PAS la librairie tant qu'elle n'est pas approuvée dans answers.json.${allowedTxt}
+Avant d'introduire une NOUVELLE librairie ou dépendance qui n'est pas déjà approuvée, tu DOIS demander l'autorisation humaine via le protocole : crée une décision (type "decision", profil "architecte-technique") avec un champ "library" = nom exact de la librairie, un titre "Utiliser la librairie X ?", et les options [{"label":"Autoriser"},{"label":"Refuser"}]. N'installe PAS la librairie tant qu'elle n'est pas approuvée dans une réponse humaine.${allowedTxt}
 --- FIN POLITIQUE ---\n`;
 }
 
-export function buildG0Prompt({ intakePath, hasAnswers, hasSources }) {
+export function buildG0Prompt({ intakePath, hasSources }) {
   return `Tu agis comme @project-bootstrapper, en suivant CLAUDE.md, .claude/rules/ et .claude/agents/project-bootstrapper.md.
 
 Objectif de l'étape G0 (Lancement) : à partir du besoin client fourni, STRUCTURER les besoins clés du projet et préparer le contexte projet.
@@ -73,7 +79,7 @@ Travail attendu :
 2. Structure les besoins clés par dimension : besoin métier / valeur, utilisateurs et usages, processus, données, systèmes existants, contraintes, orientations d'architecture, et sécurité.
 3. Produis une synthèse claire dans /livrables/00-contexte/intake-synthesis.md.
 4. Pour CHAQUE imprécision ou information structurante manquante, pose une question via le protocole (pending-input.json), routée vers le bon profil. Ne devine pas les éléments structurants.
-${hasAnswers ? "5. Des réponses humaines sont disponibles dans livrables/_governance/agent-io/answers.json : intègre-les, mets à jour la synthèse et le contexte projet, et si le contexte est suffisant, produis /livrables/_governance/gates/G0-project-context-ready.md en PASS. Sinon, repose uniquement les questions encore bloquantes." : "5. Ne déclare pas G0 PASS tant que des éléments structurants restent imprécis : liste-les comme questions."}
+5. Ne déclare pas G0 PASS tant que des éléments structurants restent imprécis : liste-les comme questions. Si le contexte est suffisant, produis /livrables/_governance/gates/G0-project-context-ready.md en PASS.
 
 ${contractBlock()}`;
 }
@@ -88,7 +94,7 @@ function inputsBlock(inputs) {
 }
 
 /** Generic prompt to advance any phase G1..G7 with its owner agents. */
-export function buildPhasePrompt(phase, { hasAnswers, inputs } = {}) {
+export function buildPhasePrompt(phase, { inputs } = {}) {
   const produces = (phase.produces || []).map((p) => `- ${p}`).join("\n");
   return `Tu fais avancer l'étape ${phase.id} (${phase.title}) de la chaîne de développement, en agissant comme ${phase.agents || "l'agent responsable de l'étape"}, conformément à CLAUDE.md, aux fichiers de .claude/rules/ et aux fichiers d'agents concernés dans .claude/agents/.
 
@@ -97,23 +103,92 @@ Objectif de l'étape : ${phase.goal || phase.plain}
 Avant de produire :
 1. Lis le profil projet actif (project/PROJECT.md et les fichiers project/<slug>/...).
 2. Lis les livrables des étapes précédentes dans /livrables/ pour t'appuyer dessus.
-${hasAnswers ? "3. Lis les réponses humaines dans livrables/_governance/agent-io/answers.json et intègre-les sans reposer les mêmes questions." : "3. Ne devine pas les éléments structurants manquants : pose-les en questions via le protocole."}
+3. Ne devine pas les éléments structurants manquants : pose-les en questions via le protocole.
 
 Livrables attendus pour cette étape :
 ${produces || "- (voir les fichiers d'agents et conventions-livrables.md)"}
-${inputsBlock(inputs)}${repriseHint(phase.id)}
+${inputsBlock(inputs)}${repriseHint(phase.id)}${phase.id === "G5" ? acceptanceRulesText() : ""}
 Validation de l'étape :
-- Quand l'étape est complète selon .claude/rules/quality-gates.md, écris ou mets à jour /livrables/_governance/gates/${phase.gateFile || phase.id}.md avec **Status**: PASS (ou FAIL si un élément structurant bloque, ou PASS_WITH_RISK si un risque est explicitement accepté et possédé).
+${gateInstruction(phase)}
 - Pour toute imprécision, information manquante ou choix structurant qui dépasse les preuves disponibles, pose une question ou une décision via le protocole, routée vers le bon profil.
 ${PARALLEL_HINT}
 ${contractBlock()}${taskProtocolText()}`;
 }
 
 /**
+ * Tests-first rule for every agent that touches product code: @qa's acceptance tests are
+ * the contract. They are locked (sha256) by the platform; a change is detected and fails
+ * the gate. A test that looks wrong goes back to @qa through a decision.
+ */
+export function acceptanceRulesText() {
+  return `
+--- TESTS D'ACCEPTATION (contrat, écrits par @qa avant le développement) ---
+- Le manifeste \`livrables/07-tests/acceptance/manifest.json\` liste, pour chaque User Story, ses critères et les fichiers de tests d'acceptation qui les vérifient. Lis-le avant de coder.
+- Ton travail est FINI quand les tests d'acceptation de tes User Stories PASSENT (lance-les avec les commandes de \`livrables/07-tests/verification.json\`), en plus de tes propres tests unitaires.
+- Tu NE MODIFIES PAS, ne supprimes pas et ne désactives pas (skip, only, assertions affaiblies) ces fichiers : ils sont verrouillés par la plateforme, toute modification est détectée et fait échouer le gate.
+- Si un test d'acceptation te paraît faux ou contradictoire avec la User Story, NE le contourne pas : pose une décision au profil "qa" via le protocole, en citant le test et le critère.
+- La plateforme rejoue elle-même ces commandes : seuls les résultats réels comptent, pas ce que tu en écris.
+--- FIN TESTS D'ACCEPTATION ---
+`;
+}
+
+/** Tests-first at G4: @qa turns every User Story's acceptance criteria into executable tests. */
+export function buildAcceptanceTestsPrompt() {
+  return `Tu agis comme @qa pour l'étape G4 (Backlog), conformément à CLAUDE.md, .claude/rules/ et .claude/agents/qa.md.
+
+OBJECTIF : écrire, AVANT le développement, les TESTS D'ACCEPTATION EXÉCUTABLES de chaque User Story. Ils deviendront le contrat du développeur : il devra les faire passer sans les modifier. Ils échoueront tant que le produit n'est pas développé, c'est attendu.
+
+Avant d'écrire : lis project/PROJECT.md et project/<slug>/stack.md, l'architecture technique (04-architecture-technique : stack, organisation du code, conventions de test), les écrans et flows (02-ui) et les User Stories (05-backlog/user-stories/).
+
+Travail attendu :
+1. Pour CHAQUE User Story qui n'a pas encore de tests dans le manifeste : un fichier de tests d'acceptation (un fichier par US), un cas de test par critère d'acceptation. Le NOM de chaque cas contient l'identifiant de l'US et du critère (ex. « US-012 AC2 refuse un montant négatif ») : la plateforme relie les résultats aux US par ce nom.
+   - Teste le COMPORTEMENT observable (API, écran, données), pas l'implémentation interne : le développeur doit rester libre de sa conception.
+   - User Story avec écran : un test de bout en bout de son parcours (outil e2e de la stack, ex. Playwright) en plus des tests d'API si utile.
+   - Place les tests dans le dossier de tests du produit prévu par l'architecture (ex. tests/acceptance/). Si le harnais de test n'existe pas encore, crée le MINIMUM nécessaire (configuration du runner, dépendances de test), sans écrire de code produit.
+2. Écris le manifeste \`livrables/07-tests/acceptance/manifest.json\` :
+{
+  "stories": [
+    { "us": "US-012", "title": "…", "criteria": [ { "id": "AC1", "text": "…" } ], "tests": ["chemin/relatif/au/workspace/du/fichier-de-test"] }
+  ]
+}
+3. Écris (ou complète) \`livrables/07-tests/verification.json\` : les commandes que la PLATEFORME exécutera elle-même pour prouver les gates G5 et G6. Un humain les approuvera avant la première exécution.
+{
+  "steps": [
+    { "id": "install", "label": "Installation", "kind": "install", "command": "npm ci", "cwd": "chemin/relatif", "required": true, "timeoutMinutes": 15 },
+    { "id": "build", "label": "Build", "kind": "build", "command": "npm run build", "cwd": "…", "required": true },
+    { "id": "unit", "label": "Tests unitaires", "kind": "unit", "command": "…", "cwd": "…", "junit": "chemin/relatif/rapport-unit.xml", "required": true },
+    { "id": "acceptance", "label": "Tests d'acceptation", "kind": "acceptance", "command": "…", "cwd": "…", "junit": "chemin/relatif/rapport-acceptance.xml", "required": true },
+    { "id": "e2e", "label": "Parcours de bout en bout", "kind": "e2e", "command": "…", "cwd": "…", "junit": "…", "required": true, "gates": ["G6"] }
+  ]
+}
+   - Commandes NON interactives, qui se terminent seules (pas de mode watch), et qui ÉCRIVENT un rapport JUnit XML à l'emplacement "junit" (active le reporter JUnit du runner).
+   - "kind" parmi install, build, lint, unit, acceptance, e2e, other. "cwd" et "junit" sont relatifs au workspace et y restent.
+   - Si l'e2e a besoin du produit lancé, la commande le démarre elle-même (ex. option webServer de Playwright) ; pas de serveur laissé tournant.
+   - N'invente pas de commande dont la stack ne dispose pas : si un élément manque (pas encore de projet de code), écris ce qui sera vrai une fois le squelette créé et signale-le dans le résumé.
+4. Vérifie la couverture : chaque critère d'acceptation de chaque US a au moins un cas de test. Un critère non testable tel qu'écrit → pose une question au profil "po" via le protocole, au lieu d'écrire un test vague.
+
+N'écris PAS le fichier de gate. Ne développe PAS le produit.
+${contractBlock()}${riskRegisterProtocolText()}${taskProtocolText()}`;
+}
+
+/**
+ * Who writes the gate status. A phase with a reviewer: the producer never judges its own
+ * work — the reviewer decides (and is chained automatically after the producer).
+ * Without a reviewer (G0, G6R), the producer writes it, as before.
+ */
+function gateInstruction(phase) {
+  const gateRel = `/livrables/_governance/gates/${phase.gateFile || phase.id}.md`;
+  if (REVIEWERS[phase.id]) {
+    return `- N'écris PAS la ligne **Status** du gate \`${gateRel}\` : c'est ${REVIEWERS[phase.id]} qui décide, lors de la revue lancée après toi. Termine en résumant ce qui est prêt pour la revue et ce qui reste ouvert.`;
+  }
+  return `- Quand l'étape est complète selon .claude/rules/quality-gates.md, écris ou mets à jour \`${gateRel}\` avec **Status**: PASS (ou FAIL si un élément structurant bloque, ou PASS_WITH_RISK si un risque est explicitement accepté et possédé).`;
+}
+
+/**
  * Option A: prompt scoped to a SINGLE agent of a phase, for parallel execution.
  * Each parallel agent writes ONLY in its own folders and to its own pending file.
  */
-export function buildAgentTaskPrompt(phase, task, { pendingFile, inputs }) {
+export function buildAgentTaskPrompt(phase, task, { pendingFile, risksFile, tasksFile, inputs }) {
   const produces = (task.produces || []).map((p) => `- ${p}`).join("\n");
   return `Tu fais avancer l'étape ${phase.id} (${phase.title}) en agissant UNIQUEMENT comme ${task.agent}, conformément à CLAUDE.md, .claude/rules/ et .claude/agents/.
 
@@ -131,7 +206,7 @@ ${inputsBlock(inputs)}${repriseHint(phase.id)}
 
 Pour toute imprécision ou choix structurant, pose une question/décision via le protocole (dans TON fichier ci-dessous). N'écris PAS le fichier de gate (la revue de l'étape s'en charge après convergence).
 ${PARALLEL_HINT}
-${contractBlock(pendingFile)}`;
+${contractBlock(pendingFile)}${riskRegisterProtocolText(risksFile)}${taskProtocolText(tasksFile)}`;
 }
 
 /**
@@ -139,7 +214,7 @@ ${contractBlock(pendingFile)}`;
  * running in parallel with other BC lanes of the same wave. Anti-collision is by
  * BC file-ownership + per-US deliverables + deferred governance consolidation.
  */
-export function buildDevLanePrompt(task, { pendingFile } = {}) {
+export function buildDevLanePrompt(task, { pendingFile, risksFile, tasksFile } = {}) {
   const list = (task.usList || [])
     .map((u) => `- ${u.id} — ${u.title}${u.integration ? ` [INTÉGRATION inter-BC : ${(u.integrationBCs || []).join(", ")}]` : ""}`)
     .join("\n");
@@ -153,7 +228,7 @@ Tu es la LANE du Bounded Context ${task.bc} (${task.bcName}). Tu travailles EN P
 
 User Stories de ta lane (à développer en tranche verticale + tests) :
 ${list || "- (aucune)"}
-
+${acceptanceRulesText()}
 Avant de coder : lis project/PROJECT.md, le design-system et les écrans (02-ui), le modèle de domaine (03-architecture-metier) et les US ci-dessus (05-backlog/user-stories/).
 
 Pour CHAQUE US développée :
@@ -162,14 +237,35 @@ Pour CHAQUE US développée :
 - N'ÉCRIS PAS dans les fichiers de gouvernance partagés (CHANGELOG-actions-agents.md, traceability-matrix.md, journaux) : une étape de CONSOLIDATION s'en chargera après la vague. À la place, dépose un fragment de journal propre à ta lane dans /livrables/06-dev/_journal-fragments/${task.agentKey}.md (créé le dossier si besoin) résumant ce que tu as fait par US.
 
 N'écris PAS le fichier de gate (la revue s'en charge après convergence).
-${contractBlock(pendingFile)}`;
+${contractBlock(pendingFile)}${riskRegisterProtocolText(risksFile)}${taskProtocolText(tasksFile)}`;
+}
+
+/**
+ * G5 integration check, run once after a wave of PARALLEL lanes: build + tests of the
+ * whole product, fixing only integration breaks between lanes (no new features).
+ */
+export function buildDevIntegrationPrompt(task, { pendingFile, risksFile, tasksFile } = {}) {
+  const lanes = (task.lanes || []).map((l) => `- ${l.bc} (${l.bcName}) : ${l.us.join(", ")}`).join("\n");
+  return `Tu agis comme @developpeur pour le CONTRÔLE D'INTÉGRATION de la vague ${task.wave} de l'étape G5, conformément à CLAUDE.md, .claude/rules/ et .claude/agents/developpeur.md.
+
+Ces lanes viennent de livrer EN PARALLÈLE, chacune sans voir le travail des autres :
+${lanes || "- (aucune)"}
+
+Ton travail :
+1. Installe les dépendances, BUILDE et lance la suite de tests du produit (commandes de /livrables/00-contexte/infrastructure-locale.md, sinon celles du code : package.json, Makefile…).
+2. Corrige UNIQUEMENT les cassures d'INTÉGRATION entre lanes : imports ou routes en double, contrats d'API divergents, migrations en conflit, dépendances incompatibles, tests cassés par une autre lane. N'ajoute AUCUNE fonctionnalité et ne réécris pas le travail d'une lane au-delà du nécessaire. Les tests d'acceptation de @qa (manifeste livrables/07-tests/acceptance/manifest.json) ne se modifient pas : un test qui te paraît faux → décision au profil "qa".
+3. Écris le compte rendu dans /livrables/06-dev/_integration/vague-${task.wave}.md : commandes lancées, build OK/KO, tests passés/échoués (nombre), cassures trouvées et correctifs appliqués.
+4. Toute cassure qui relève d'un choix d'architecture (contrat transverse à arbitrer) : NE tranche PAS, pose une décision via le protocole (profil "architecte-technique") et inscris le risque au registre.
+
+N'écris PAS le fichier de gate.
+${contractBlock(pendingFile)}${riskRegisterProtocolText(risksFile)}${taskProtocolText(tasksFile)}`;
 }
 
 /**
  * G5 consolidation: single lane, AFTER all dev waves, merges the per-lane journal
  * fragments and per-US impl notes into the shared governance files exactly once.
  */
-export function buildDevConsolidationPrompt({ pendingFile } = {}) {
+export function buildDevConsolidationPrompt({ pendingFile, risksFile, tasksFile } = {}) {
   return `Tu agis comme @developpeur pour la CONSOLIDATION de gouvernance de l'étape G5, après les vagues de développement par Bounded Context.
 
 Les lanes de dev ont écrit :
@@ -182,7 +278,7 @@ Ton travail (écriture des fichiers PARTAGÉS, faite une seule fois pour éviter
 3. Mets à jour le journal /livrables/00-contexte/journaux/journal-developpeur.md à partir des fragments, puis tu peux vider/archiver le dossier _journal-fragments.
 4. Ne réécris PAS le code. Signale toute incohérence entre lanes (contrats transverses divergents, doublons) via le protocole.
 
-${contractBlock(pendingFile)}`;
+${contractBlock(pendingFile)}${riskRegisterProtocolText(risksFile)}${taskProtocolText(tasksFile)}`;
 }
 
 /**
@@ -280,6 +376,26 @@ ${contractBlock(pendingFileRel)}`;
 }
 
 /** The reviewer evaluates a phase's deliverables and owns the gate decision. */
+function reviewEvidenceBlock(phase) {
+  if (phase.id === "G4") {
+    return `
+--- TESTS D'ACCEPTATION ---
+@qa a écrit, avant le développement, les tests d'acceptation de chaque User Story (manifeste \`livrables/07-tests/acceptance/manifest.json\`) et les commandes de vérification (\`livrables/07-tests/verification.json\`). Vérifie que CHAQUE critère d'acceptation de chaque US est couvert par au moins un test, que les tests vérifient un comportement observable (pas l'implémentation), et que les commandes sont non interactives et produisent des rapports JUnit. Une US sans test, ou un critère non couvert, est un point bloquant de G4.
+--- FIN ---
+`;
+  }
+  if (phase.id === "G5" || phase.id === "G6") {
+    return `
+--- PREUVES EXÉCUTABLES (font foi) ---
+La plateforme a rejoué elle-même le build et les tests du produit : résultats dans \`livrables/_governance/evidence/${phase.id}.md\` (verdict, étapes, acceptation par User Story, verrou des tests d'acceptation).
+- Tu ne peux PAS conclure PASS ou PASS_WITH_RISK si ces preuves sont en échec, absentes ou périmées : la plateforme ramènerait le gate à FAIL. Reprends leurs points bloquants dans ton rapport.
+- Ton jugement porte sur ce que les tests ne mesurent pas : qualité et lisibilité du code, sécurité, dette, pertinence des tests unitaires, écarts entre le code et les User Stories / l'architecture.
+--- FIN PREUVES ---
+`;
+  }
+  return "";
+}
+
 export function buildReviewPrompt(phase, reviewer) {
   return `Tu agis comme ${reviewer || "le reviewer de l'étape"} pour la REVUE de l'étape ${phase.id} (${phase.title}), conformément à .claude/rules/quality-gates.md et .claude/rules/judge-rubrics.md.
 
@@ -291,7 +407,7 @@ Travail attendu :
 3. Écris un rapport de revue dans /livrables/11-evaluations/ (format du judge report).
 4. Rends la décision de gate en écrivant /livrables/_governance/gates/${phase.gateFile || phase.id}.md avec **Status**: PASS / FAIL / PASS_WITH_RISK, les preuves, les problèmes bloquants et la prochaine action.
 5. Pour chaque problème bloquant qui nécessite une décision ou une information humaine, pose-le via le protocole, routé vers le bon profil. Ne valide pas en PASS si des éléments obligatoires manquent (préfère FAIL).
-
+${reviewEvidenceBlock(phase)}
 ${contractBlock()}${riskRegisterProtocolText()}${taskProtocolText()}`;
 }
 
@@ -302,6 +418,7 @@ ${contractBlock()}${riskRegisterProtocolText()}${taskProtocolText()}`;
  * are escalated via the protocol instead of guessed.
  */
 export function buildRemediationPrompt(phase, agent, gateStatus) {
+  const reviewer = REVIEWERS[phase.id];
   const gateRel = `livrables/_governance/gates/${phase.gateFile || phase.id}.md`;
   const isFail = gateStatus === "FAIL";
   const fixLine = phase.id === "G5"
@@ -325,10 +442,14 @@ ${intro}
 2. Lis les livrables de l'étape dans /livrables/ et le profil projet (project/...).
 3. Pour CHAQUE point qui relève de TON périmètre, CORRIGE-le : ${fixLine}. Mets à jour les livrables Markdown impactés.
 4. Pour un point dont l'OWNER est un AUTRE profil (ex. @developpeur, @architecte-technique, @security-architect), ou qui exige une décision/information humaine, NE devine PAS : pose une décision/question via le protocole, routée vers ce profil, en décrivant précisément ce qui est attendu.
-5. Réévalue et METS À JOUR le gate \`${gateRel}\` :
-${reeval}
+${reviewer
+    ? `5. NE MODIFIE PAS la ligne **Status** du gate : tu as produit les livrables, tu ne les juges pas. Ajoute à la fin de \`${gateRel}\` une section « ## Remédiation » datée : points traités (et comment), points restants, points escaladés (à qui). ${reviewer} ré-évaluera le gate lors de la revue lancée après toi.`
+    : `5. Réévalue et METS À JOUR le gate \`${gateRel}\` :
+${reeval}`}
 6. Consigne les corrections dans les livrables de l'étape (et le changelog des actions agents si pertinent).
-${repriseHint(phase.id)}
+${repriseHint(phase.id)}${phase.id === "G5" ? acceptanceRulesText() : ""}${phase.id === "G5" || phase.id === "G6" ? `
+Les preuves exécutables de la dernière vérification (résultats réels du build et des tests, rejoués par la plateforme) sont dans \`livrables/_governance/evidence/${phase.id}.md\` : pars des échecs qu'elles listent.
+` : ""}
 ${contractBlock()}${riskRegisterProtocolText()}${taskProtocolText()}`;
 }
 
@@ -417,7 +538,7 @@ PLANIFIER (écris tes décisions dans \`${actionsFileRel}\`, crée le dossier si
 {
   "actions": [
     {
-      "type": "launch_dev | launch_phase | launch_review | remediate | launch_dev_batches | seed_risks",
+      "type": "launch_dev | launch_phase | launch_review | remediate | launch_dev_batches | write_acceptance_tests | run_verification | seed_risks",
       "label": "libellé court et clair (ex. « Revue G2 — UX/UI/domaine »)",
       "rationale": "en quoi ça rapproche l'OBJECTIF COURANT, en 1 phrase",
       "phaseId": "G0..G7 (l'étape concernée)",
@@ -490,7 +611,7 @@ TRIER LES CANDIDATS : promeus (\`promote\`) les handoffs d'agents utiles à LA D
 {
   "actions": [
     {
-      "type": "launch_dev | launch_phase | launch_review | remediate | launch_dev_batches | seed_risks",
+      "type": "launch_dev | launch_phase | launch_review | remediate | launch_dev_batches | write_acceptance_tests | run_verification | seed_risks",
       "label": "libellé court et clair",
       "rationale": "en quoi ça fait avancer LA DEMANDE, en 1 phrase",
       "phaseId": "G0..G7 (si pertinent)",
@@ -525,7 +646,7 @@ L'orchestrateur — sur confirmation explicite de l'humain — te confie cette t
 ${instruction || "(voir la conversation)"}
 
 Avant d'agir : lis project/PROJECT.md, les règles (.claude/rules/, notamment quality-gates.md et ui-frontend-quality.md), et les livrables utiles (le plan et les User Stories concernées, le design-system et les écrans sous 02-ui/, l'état d'infrastructure locale).
-${repriseHint(phaseId)}Respecte la Definition of Done applicable : pour une User Story user-facing, l'écran doit être RÉELLEMENT monté et câblé (états Chargement / Vide / Erreur), avec une preuve L3/UI exécutée contre le back local. Ne réduis pas le périmètre demandé sans arbitrage humain.
+${repriseHint(phaseId)}${acceptanceRulesText()}Respecte la Definition of Done applicable : pour une User Story user-facing, l'écran doit être RÉELLEMENT monté et câblé (états Chargement / Vide / Erreur), avec une preuve L3/UI exécutée contre le back local. Ne réduis pas le périmètre demandé sans arbitrage humain.
 ${contractBlock(pendingFileRel)}${riskRegisterProtocolText(risksFileRel)}${taskProtocolText(tasksFileRel)}`;
 }
 
@@ -567,15 +688,27 @@ RÈGLES IMPORTANTES :
 - N'écris QUE ce fichier JSON. Ne modifie pas le code du produit.`;
 }
 
-export function buildResumePrompt({ phaseLabel, agent }) {
-  return `Tu reprends le travail de l'étape ${phaseLabel || ""} en agissant comme ${agent || "l'agent responsable"}.
+export function buildResumePrompt({ phaseLabel, agent, answersFileRel, originalPrompt, sessionResumed, pendingFileRel }) {
+  const answers = answersFileRel || "livrables/_governance/agent-io/answers.json";
+  const head = sessionResumed
+    ? `Tu reprends TA session de travail sur ${phaseLabel || "la tâche"} (tu agis toujours comme ${agent || "l'agent responsable"}). Tu avais posé des questions ; les réponses sont arrivées.`
+    : originalPrompt
+      ? `Tu reprends une tâche interrompue en attendant des réponses humaines. Voici la CONSIGNE D'ORIGINE de cette tâche — elle reste ton cadre (périmètre, fichiers autorisés, livrables) :
 
-Des réponses humaines viennent d'être fournies dans \`livrables/_governance/agent-io/answers.json\`. Lis-les, intègre-les à tes livrables, et continue l'étape :
-- mets à jour les livrables Markdown concernés ;
-- si de nouvelles imprécisions ou décisions apparaissent, pose-les via le protocole ;
-- si l'étape est désormais complète, mets à jour le fichier de gate correspondant.
+--- CONSIGNE D'ORIGINE ---
+${originalPrompt}
+--- FIN CONSIGNE D'ORIGINE ---
 
-${contractBlock()}`;
+Le travail déjà fait est dans les livrables : relis-les avant de continuer, ne recommence pas de zéro.`
+      : `Tu reprends le travail de l'étape ${phaseLabel || ""} en agissant comme ${agent || "l'agent responsable"}.`;
+  return `${head}
+
+Les réponses sont dans \`${answers}\`. Lis-les, intègre-les à tes livrables, et continue :
+- mets à jour les livrables concernés ;
+- si de nouvelles imprécisions ou décisions apparaissent, pose-les via le protocole (fichier indiqué ci-dessous — il remplace tout fichier de questions précédent) ;
+- respecte la règle de gate de ta consigne (si une revue est prévue, n'écris pas le Status toi-même).
+
+${contractBlock(pendingFileRel || undefined, { answersFile: answers })}`;
 }
 
 /**

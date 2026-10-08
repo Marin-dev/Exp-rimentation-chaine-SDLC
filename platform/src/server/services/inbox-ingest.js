@@ -5,8 +5,9 @@ import { ingestRiskItems } from "./risks-store.js";
 import { ingestTaskItems } from "./tasks-store.js";
 
 /** Ingest the AI's reported choices for delegated items, then clear the file. */
-export function ingestResolutions(paths) {
-  const content = readTextSafe(paths.resolutionsFile);
+export function ingestResolutions(paths, fileOverride) {
+  const file = fileOverride || paths.resolutionsFile;
+  const content = readTextSafe(file);
   if (!content) return { applied: 0 };
   let parsed;
   try {
@@ -16,7 +17,7 @@ export function ingestResolutions(paths) {
   }
   const list = Array.isArray(parsed) ? parsed : Array.isArray(parsed.resolutions) ? parsed.resolutions : [];
   const res = applyResolutions(paths, list);
-  try { fs.rmSync(paths.resolutionsFile, { force: true }); } catch {}
+  try { fs.rmSync(file, { force: true }); } catch {}
   return res;
 }
 

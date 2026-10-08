@@ -16,6 +16,7 @@ import OrchestratorScreen from "./screens/OrchestratorScreen.jsx";
 import PhaseScreen from "./screens/PhaseScreen.jsx";
 import GitScreen from "./screens/GitScreen.jsx";
 import SettingsScreen from "./screens/SettingsScreen.jsx";
+import RequestsScreen, { NewRequestForm } from "./screens/RequestsScreen.jsx";
 import DecisionDetailModal from "./components/DecisionDetailModal.jsx";
 import RiskDetailModal from "./components/RiskDetailModal.jsx";
 import CreateDecisionModal from "./components/CreateDecisionModal.jsx";
@@ -23,6 +24,7 @@ import RunConsole from "./components/RunConsole.jsx";
 
 const TITLES = {
   dashboard: "Accueil",
+  requests: "Demandes",
   orchestrator: "Orchestrateur",
   decisions: "Décisions",
   risks: "Risques",
@@ -58,6 +60,8 @@ export default function App() {
   // Live console for ANY running agent (resolution, audit, remediation, phase…),
   // opened from the header indicator regardless of the run's phase.
   const [openRun, setOpenRun] = useState(null);
+  const [showNewRequest, setShowNewRequest] = useState(false);
+  const [focusRequest, setFocusRequest] = useState(null);
 
   function load() {
     Api.getState()
@@ -155,7 +159,7 @@ export default function App() {
         setNotice({ type: "info", text: res.message || "Aucune User Story à développer." });
         return;
       }
-      const w = (res.meta && res.meta.waves ? res.meta.waves.length : 0);
+      const w = (res.meta && res.meta.waves ? res.meta.waves.filter((x) => x.bcs).length : 0);
       setNotice({ type: "info", text: `Dev par batch lancé : ${res.meta?.todo ?? "?"} US en ${w} vagues (par Bounded Context).` });
       setActiveRun(null);
       setActiveGroup({ groupId: res.groupId, phaseId });
@@ -200,7 +204,7 @@ export default function App() {
       const phase = state.phases.find((p) => p.id === phaseId);
       const res = await Api.startReview(phaseId);
       setActiveGroup(null);
-      setActiveRun({ id: res.runId, label: `${phaseId} · Revue (${phase ? phase.reviewer : ""})`, phaseId });
+      setActiveRun({ id: res.runId, label: res.label || `${phaseId} · Revue (${phase ? phase.reviewer : ""})`, phaseId });
       setSelectedPhaseId(phaseId);
       setScreen("phase");
     } catch (e) {
@@ -291,6 +295,7 @@ export default function App() {
         crumb={state.config.workspaceRoot}
         activeRuns={active.runs}
         onOpenPhase={(id) => { setSelectedPhaseId(id); setScreen("phase"); }}
+        onNewRequest={() => setShowNewRequest(true)}
         onOpenRun={(r) => setOpenRun({ id: r.id, label: r.agent ? `${r.agent}${r.phaseId ? " · " + r.phaseId : ""}` : (r.label || "Travail de l'IA") })}
       >
         {screen === "dashboard" ? (
@@ -318,6 +323,15 @@ export default function App() {
             profile={profile}
             onOpenRisk={setOpenRisk}
             onStateChange={setState}
+          />
+        ) : null}
+        {screen === "requests" ? (
+          <RequestsScreen
+            state={state}
+            profile={profile}
+            focusId={focusRequest}
+            onOpenDecision={setOpenDecision}
+            onOpenRun={(r) => setOpenRun(r)}
           />
         ) : null}
         {screen === "tasks" ? (
@@ -361,6 +375,7 @@ export default function App() {
             onStateRefresh={refreshState}
             onStateChange={setState}
             onStartImpact={impactFromDoc}
+            onRunStarted={(run) => { setActiveGroup(null); setActiveRun(run); }}
           />
         ) : null}
         {screen === "documents" ? (
@@ -445,6 +460,34 @@ export default function App() {
           <button className="btn btn-ghost btn-xs btn-square" onClick={() => setNotice(null)} aria-label="Fermer">
             <X size={15} />
           </button>
+        </div>
+      ) : null}
+
+      {showNewRequest ? (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4" onClick={() => setShowNewRequest(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Nouvelle demande"
+            className="bg-base-100 rounded-lg shadow-xl w-full max-w-xl p-5"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === "Escape") setShowNewRequest(false); }}
+          >
+            <div className="flex items-center mb-3">
+              <h3 className="text-base font-bold m-0 flex-1">Nouvelle demande</h3>
+              <button className="btn btn-ghost btn-xs btn-square" onClick={() => setShowNewRequest(false)} aria-label="Fermer"><X size={15} /></button>
+            </div>
+            <NewRequestForm
+              profile={profile}
+              autoFocus
+              onSubmitted={(req) => {
+                setShowNewRequest(false);
+                setFocusRequest(req ? req.id : null);
+                setScreen("requests");
+                refreshState();
+              }}
+            />
+          </div>
         </div>
       ) : null}
 

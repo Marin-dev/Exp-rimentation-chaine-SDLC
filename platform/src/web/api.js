@@ -168,6 +168,19 @@ export const Api = {
   getUsReport: () => request("/api/dev/us-report"),
   getGroup: (groupId) => request(`/api/runs/group/${encodeURIComponent(groupId)}`),
   getActiveRuns: () => request("/api/runs/active"),
+  listRequests: () => request("/api/requests"),
+  submitRequest: (text, by) => post("/api/requests", { text, by }),
+  commentRequest: (id, text, by) => post(`/api/requests/${encodeURIComponent(id)}/comment`, { text, by }),
+  retryRequest: (id) => post(`/api/requests/${encodeURIComponent(id)}/retry`, {}),
+  cancelRequest: (id) => post(`/api/requests/${encodeURIComponent(id)}/cancel`, {}),
+  setRequestPriority: (id, priority) => post(`/api/requests/${encodeURIComponent(id)}/priority`, { priority }),
+  getVerification: () => request("/api/verification"),
+  approveVerification: (hash, by) => post("/api/verification/approve", { hash, by }),
+  setEvidencePolicy: (enabled) => post("/api/verification/policy", { enabled }),
+  runVerification: (gateId) => post("/api/verification/run", { gateId }),
+  launchAcceptanceTests: () => post("/api/acceptance/launch", {}),
+  cancelRun: (runId) => post(`/api/runs/${encodeURIComponent(runId)}/cancel`, {}),
+  cancelGroup: (groupId) => post(`/api/runs/group/${encodeURIComponent(groupId)}/cancel`, {}),
   startReview: (phaseId) =>
     request("/api/runs/review", {
       method: "POST",
@@ -320,6 +333,12 @@ export const Api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ permissionMode })
+    }),
+  setRunSettings: (settings) =>
+    request("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings)
     }),
   setAutopilotSettings: (autopilot) =>
     request("/api/config", {

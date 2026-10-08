@@ -6,6 +6,7 @@ const DEFAULT_GITIGNORE = `node_modules/
 dist/
 build/
 .state/
+.claude/control-center/
 *.log
 .DS_Store
 .env

@@ -452,6 +452,9 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
                 </div>
               ) : null}
 
+              {decision.humanOnly ? (
+                <p className="text-[12px] text-ey-gray01 mb-3 mt-0">Cette décision revient à un humain : elle ne peut pas être confiée à un agent.</p>
+              ) : (
               <label className="flex items-start gap-2 text-[12.5px] mb-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -466,6 +469,7 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
                   </span>
                 </span>
               </label>
+              )}
 
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[12px] text-ey-gray01 flex items-center gap-1.5">
@@ -473,6 +477,7 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
                   en tant que <b className="text-ey-black">{me?.label}</b>
                 </span>
                 <div className="flex items-center gap-2">
+                  {decision.humanOnly ? null : (
                   <button
                     className="btn btn-outline btn-sm gap-1.5"
                     onClick={() => resolveVia("delegate")}
@@ -481,6 +486,7 @@ export default function DecisionDetailModal({ decision, profiles, currentProfile
                   >
                     <Bot size={15} /> Confier à {targetLabel}
                   </button>
+                  )}
                   <button className="btn btn-primary btn-sm" onClick={submit} disabled={!canSubmit || busy}>
                     {busy ? "…" : viaAgent ? `Valider via ${targetLabel}` : "Valider la décision"}
                   </button>

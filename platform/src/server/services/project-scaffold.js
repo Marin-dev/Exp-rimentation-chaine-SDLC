@@ -72,6 +72,12 @@ export function scaffoldProject(targetPath) {
       fs.mkdirSync(path.join(resolved, "livrables", d), { recursive: true });
     }
     fs.mkdirSync(path.join(resolved, ".claude", "control-center"), { recursive: true });
+    // New projects: G5 / G6 gates are capped by executable evidence from the start.
+    fs.writeFileSync(
+      path.join(resolved, ".claude", "control-center", "evidence-policy.json"),
+      JSON.stringify({ enabled: true, enabledAt: new Date().toISOString() }, null, 2),
+      "utf8"
+    );
     fs.mkdirSync(path.join(resolved, "project"), { recursive: true });
   } catch (e) {
     return { ok: false, error: `Échec de création : ${e.message}` };

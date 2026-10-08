@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadConfig, saveConfig } from "../config/store.js";
 import { createWorkspacePaths } from "../config/paths.js";
-import { startRun, listRuns, getRun } from "./runs.js";
-import { listGroups } from "./group-runner.js";
+import { startRun, listRuns, getRun, cancelRun, liveCostUsd } from "./runs.js";
+import { listGroups, cancelGroup } from "./group-runner.js";
 import { getSpend } from "./spend-store.js";
 import { listDecisions, getDecision, answerDecision } from "./decisions-store.js";
 import { resolveViaAgent, resumeRaisingRun } from "./resolve-via-agent.js";
@@ -16,6 +16,7 @@ import { markActionTaskLaunched, actionSignature } from "./tasks-store.js";
 import { buildOrchestratorSnapshot } from "./orchestrator-snapshot.js";
 import { buildAutopilotPlanPrompt } from "./run-prompts.js";
 import { readTextSafe } from "./fs-utils.js";
+import { reconcileRequests } from "./request-flow.js";
 
 /**
  * Autopilot conductor ("gestion automatique").
@@ -42,10 +43,16 @@ const AUTONOMOUS_ACTIONS = new Set([
   "launch_review",
   "remediate",
   "launch_dev_batches",
+  "write_acceptance_tests",
+  // Runs only the commands a human approved (see verification.js).
+  "run_verification",
   "seed_risks"
 ]);
 
 const TICK_MS = 6000;
+// The autopilot's planner writes here (not the chat's orchestrator-actions.json), so a
+// human chatting with the orchestrator meanwhile can't swap proposals with it.
+const PLAN_FILE_REL = "livrables/_governance/agent-io/orchestrator-actions-autopilot.json";
 // After this many consecutive planning turns that launch NOTHING (orchestrator has no move)
 // while the objective still isn't met, stop and ask the human — we're stuck, not converging.
 const MAX_EMPTY_PLANS = 2;
@@ -88,6 +95,9 @@ function persist() {
       launched: session.launched.slice(-40),
       launchedSignatures: [...session.launchedSignatures],
       notedDoneRunIds: [...session.notedDoneRunIds],
+      ownRuns: [...session.ownRuns],
+      resolverByDecision: session.resolverByDecision,
+      planRunId: session.planRunId || null,
       escalations: session.escalations,
       emptyPlans: session.emptyPlans,
       doneSummary: session.doneSummary || null,
@@ -158,11 +168,23 @@ function isIdle() {
   return runningRuns === 0 && runningGroups === 0;
 }
 
-function runningCount() {
-  return (
-    listRuns().filter((r) => r.status === "running").length +
-    listGroups().filter((g) => g.status === "running").length
-  );
+/** Agent processes running right now (a dev batch counts each of its lanes). */
+function runningAgents() {
+  return listRuns().filter((r) => r.status === "running").length;
+}
+
+function isRunning(runId) {
+  const r = runId ? getRun(runId) : null;
+  return Boolean(r && r.status === "running");
+}
+
+/** Stop everything this session launched (runs, resolvers, planner, dev batches). */
+function cancelOwnWork(reason) {
+  if (!session) return;
+  for (const id of session.ownRuns) {
+    if (String(id).startsWith("grp-")) cancelGroup(id, reason);
+    else if (isRunning(id)) cancelRun(id, reason);
+  }
 }
 
 /** Terminal stop (budget / iterations / convergence / stuck / manual). Turns the flag off. */
@@ -220,9 +242,13 @@ function isStructural(d) {
  * planning run's onDone (synchronous), so no tick can interleave. Returns
  * { launched, done, summary }.
  */
+function planFile(paths) {
+  return path.join(paths.workspaceRoot, ...PLAN_FILE_REL.split("/"));
+}
+
 function consumePlanOutput(config, paths) {
-  const raw = readTextSafe(paths.orchestratorActionsFile);
-  try { fs.rmSync(paths.orchestratorActionsFile, { force: true }); } catch {}
+  const raw = readTextSafe(planFile(paths));
+  try { fs.rmSync(planFile(paths), { force: true }); } catch {}
   if (!raw) return { launched: 0, done: false, summary: "" };
   let parsed = {};
   try { parsed = JSON.parse(raw); } catch { return { launched: 0, done: false, summary: "" }; }
@@ -249,6 +275,7 @@ function consumePlanOutput(config, paths) {
       const instr = String(action.instruction || action.rationale || "").replace(/\s+/g, " ").trim();
       if (session) {
         if (sig) session.launchedSignatures.add(sig);
+        if (result.runId || result.groupId) session.ownRuns.add(result.runId || result.groupId);
         session.launched.push({
           at: now(),
           label: result.label || action.label || type,
@@ -270,39 +297,44 @@ function consumePlanOutput(config, paths) {
 }
 
 /** One orchestrator planning turn toward the demand: propose a bounded batch, then auto-launch it. */
-function planTurn(config, paths, snapshot) {
-  try { fs.rmSync(paths.orchestratorActionsFile, { force: true }); } catch {}
+function planTurn(config, paths, snapshot, { idle }) {
+  try { fs.rmSync(planFile(paths), { force: true }); } catch {}
   note("Analyse de la demande et planification du prochain lot…");
-  startRun(config, {
+  const runId = startRun(config, {
     label: "Copilote · Planification",
-    kind: "chat",
+    // Own kind: the planner can run on a lighter model (Réglages → modèles par type de run).
+    kind: "plan",
     phaseId: null,
     agent: "@orchestrateur",
     prompt: buildAutopilotPlanPrompt({
       request: session ? session.request : "",
       snapshot,
-      actionsFileRel: "livrables/_governance/agent-io/orchestrator-actions.json",
+      actionsFileRel: PLAN_FILE_REL,
       alreadyDone: session ? session.launched.map((l) => `${l.label}${l.agent ? ` (${l.agent}${l.phaseId ? `, ${l.phaseId}` : ""})` : ""}`) : []
     }),
     cwd: paths.workspaceRoot,
     onDone: () => {
       // Same coordination side-effects as the interactive chat: proposals become tracked
       // tasks and candidate triage is applied — THEN we auto-launch the batch.
-      ingestOrchestratorActionsAsTasks(paths, { raisedBy: "@orchestrateur" });
-      applyOrchestratorTaskOps(paths);
+      ingestOrchestratorActionsAsTasks(paths, { raisedBy: "@orchestrateur" }, planFile(paths));
+      applyOrchestratorTaskOps(paths, planFile(paths));
       const out = consumePlanOutput(config, paths);
       if (!session) return;
+      session.planRunId = null;
       // The demand is finished only when the orchestrator says so AND it launched nothing
       // this turn (no work still pending). Otherwise let the launched batch run first.
-      if (out.done && out.launched === 0) {
-        session.doneSummary = out.summary || "Demande accomplie.";
-      } else {
-        session.doneSummary = null;
-      }
-      session.emptyPlans = out.launched > 0 ? 0 : session.emptyPlans + 1;
+      session.doneSummary = out.done && out.launched === 0 ? out.summary || "Demande accomplie." : null;
+      // An empty plan while agents are still working is a legitimate "wait"; only an empty
+      // plan made with nothing in flight means the orchestrator is out of moves.
+      if (out.launched > 0) session.emptyPlans = 0;
+      else if (idle) session.emptyPlans += 1;
       persist();
     }
   });
+  if (session) {
+    session.planRunId = runId;
+    session.ownRuns.add(runId);
+  }
 }
 
 /** The core state machine — one pass. Never blocks; each pass either acts or waits. */
@@ -316,11 +348,13 @@ async function tick() {
   }
   const paths = createWorkspacePaths(config.workspaceRoot);
 
-  // 1. Guard rails.
-  const spent = Math.max(0, safeSpend(paths, config.pricing) - session.baselineSpend);
+  // 1. Guard rails. The spend includes what the runs still in flight have already burnt
+  //    (live token usage), so a long parallel batch can't blow far past the cap unseen.
+  const spent = Math.max(0, safeSpend(paths, config.pricing) - session.baselineSpend) + liveCostUsd(config.pricing);
   session.spentUsd = spent;
   if (ap.budgetUsd && spent >= ap.budgetUsd) {
-    finish("budget", `Plafond de dépense atteint (${spent.toFixed(2)} $ sur ${ap.budgetUsd} $).`);
+    cancelOwnWork("Plafond de dépense de l'autopilote atteint.");
+    finish("budget", `Plafond de dépense atteint (${spent.toFixed(2)} $ sur ${ap.budgetUsd} $) : les agents lancés par l'autopilote ont été arrêtés.`);
     return;
   }
   if (ap.maxIterations && session.iterations >= ap.maxIterations) {
@@ -328,18 +362,21 @@ async function tick() {
     return;
   }
 
-  // 2. Bounded concurrency: let in-flight work finish before doing anything new.
-  if (runningCount() >= Math.max(1, ap.maxConcurrent || 1) || !isIdle()) {
+  // Report the completion of any launched agent we haven't noted yet, so the journal
+  // shows "✓ terminé" (and files produced) — not just "lancé".
+  noteFinishedRuns();
+
+  // 2. Bounded concurrency: never more than maxConcurrent agents at once. Below the cap,
+  //    the conductor keeps working (delegating decisions, planning) alongside them.
+  const maxConcurrent = Math.max(1, Number(ap.maxConcurrent) || 1);
+  let capacity = maxConcurrent - runningAgents();
+  if (capacity <= 0) {
     schedule(TICK_MS);
     return;
   }
 
-  // Idle now: report the completion of any launched agent we haven't noted yet, so the
-  // journal shows "✓ terminé" (and files produced) — not just "lancé".
-  noteFinishedRuns();
-
   // 3. Pending decisions → delegate to the expert; escalate to the human only if the
-  //    expert couldn't decide (a decision still pending AFTER its resolver has run).
+  //    expert couldn't decide (a decision still pending AFTER its resolver has finished).
   const pending = listDecisions(paths).filter((d) => d.status === "pending");
   const mode = ap.escalation || "expert-blocked";
   const fresh = pending.filter((d) => !session.delegated.has(d.id));
@@ -348,11 +385,17 @@ async function tick() {
     let started = 0;
     const straightToHuman = [];
     for (const d of fresh) {
+      // Pilot-only decisions (e.g. accepting an enhancement) always go to the human.
+      const delegate = !d.humanOnly && (mode === "always-delegate" || mode === "expert-blocked" || (mode === "structural" && !isStructural(d)));
+      if (delegate && capacity <= 0) break; // the rest waits for a free slot
       session.delegated.add(d.id); // handled once — never re-delegated in a loop
-      if (mode === "always-delegate" || mode === "expert-blocked" || (mode === "structural" && !isStructural(d))) {
+      if (delegate) {
         const r = resolveViaAgent(config, paths, { id: d.id, mode: "delegate" });
         if (r.ok) {
           started += 1;
+          capacity -= 1;
+          session.ownRuns.add(r.resolverRunId);
+          session.resolverByDecision[d.id] = r.resolverRunId;
           note(`Décision ${d.id} « ${d.title} » déléguée à ${r.targetAgent}.`);
         } else {
           straightToHuman.push(escalationView(d));
@@ -362,34 +405,40 @@ async function tick() {
         straightToHuman.push(escalationView(d));
       }
     }
+    if (straightToHuman.length) {
+      pauseForHuman(straightToHuman);
+      return;
+    }
     if (started) {
       session.iterations += 1;
       persist();
       schedule(TICK_MS);
       return;
     }
-    if (straightToHuman.length) {
-      pauseForHuman(straightToHuman);
-      return;
-    }
   }
 
-  // Idle + all fresh handled: any decision STILL pending was delegated but the expert
-  // couldn't resolve it (or "always-delegate" left it) → ask the human.
-  const stillPending = pending.filter((d) => session.delegated.has(d.id));
+  // A decision STILL pending once its resolver has finished: the expert couldn't decide
+  // (or "always-delegate" left it) → ask the human.
+  const stillPending = pending.filter((d) => session.delegated.has(d.id) && !isRunning(session.resolverByDecision[d.id]));
   if (stillPending.length) {
     pauseForHuman(stillPending.map(escalationView));
     return;
   }
 
-  // 4. Nothing pending. Did the orchestrator declare the demand accomplished?
-  if (session.doneSummary) {
+  // 4. One planning turn at a time.
+  if (isRunning(session.planRunId)) {
+    schedule(TICK_MS);
+    return;
+  }
+  const idle = isIdle();
+  // Nothing pending. Did the orchestrator declare the demand accomplished?
+  if (session.doneSummary && idle) {
     session.result = session.doneSummary;
     finish("done", session.doneSummary);
     return;
   }
   // Stuck: it proposes nothing and doesn't declare the demand done — ask the human.
-  if (session.emptyPlans >= MAX_EMPTY_PLANS) {
+  if (session.emptyPlans >= MAX_EMPTY_PLANS && idle) {
     finish(
       "stuck",
       "L'orchestrateur ne parvient plus à faire avancer la demande sans intervention. Précise ou reformule ta demande."
@@ -399,7 +448,7 @@ async function tick() {
   // Otherwise: plan the next batch toward the demand (gates are context, not the objective).
   const snap = await buildOrchestratorSnapshot(config, paths, { contextOnly: true });
   session.iterations += 1;
-  planTurn(config, paths, snap.text);
+  planTurn(config, paths, snap.text, { idle });
   persist();
   schedule(TICK_MS);
 }
@@ -416,6 +465,9 @@ function startSession(request, baselineSpend, restored) {
     launched: (restored && Array.isArray(restored.launched) ? restored.launched : []),
     launchedSignatures: new Set(restored && Array.isArray(restored.launchedSignatures) ? restored.launchedSignatures : []),
     notedDoneRunIds: new Set(restored && Array.isArray(restored.notedDoneRunIds) ? restored.notedDoneRunIds : []),
+    ownRuns: new Set(restored && Array.isArray(restored.ownRuns) ? restored.ownRuns : []),
+    resolverByDecision: (restored && restored.resolverByDecision) || {},
+    planRunId: (restored && restored.planRunId) || null,
     escalations: (restored && restored.escalations) || [],
     emptyPlans: (restored && restored.emptyPlans) || 0,
     doneSummary: (restored && restored.doneSummary) || null,
@@ -471,6 +523,8 @@ export function answerEscalation(input) {
   const decision = getDecision(paths, id);
   const result = answerDecision(paths, { ...input, id });
   if (!result.ok) return result;
+  // A pilot's decision on a request of the desk lets that request continue.
+  try { reconcileRequests(config, paths); } catch {}
 
   // Resume the agent that raised this question, now that all its questions are answered.
   if (result.runFullyAnswered && result.runId) {

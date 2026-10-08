@@ -11,6 +11,9 @@ export const appStateDir = path.join(platformRoot, ".state");
 export const configPath = path.join(appStateDir, "config.json");
 // App-level PowerPoint / Word templates used as style examples for generated supports.
 export const templatesDir = path.join(appStateDir, "templates");
+// Git worktrees of isolated G5 dev lanes (config.devIsolation = "worktree"). Kept OUTSIDE
+// the workspace, so a lane checkout is never picked up by the workspace's own git.
+export const worktreesRoot = process.env.SDLC_WORKTREES_DIR || path.join(appStateDir, "worktrees");
 
 // App-bundled framework template. Mirrors a workspace layout (CLAUDE.template.md → CLAUDE.md, + .claude/…)
 // so createWorkspacePaths(frameworkRoot) yields its agents/skills/mcp paths directly.
@@ -55,7 +58,23 @@ export function createWorkspacePaths(workspaceRootInput = defaultWorkspaceRoot) 
     // Autopilot session snapshot (status, iterations, escalations) so a restart can resume it.
     autopilotStateFile: path.join(stateDir, "autopilot-state.json"),
     runsDir: path.join(stateDir, "runs"),
+    // Executable evidence (platform-owned, under .claude/ so agents can't forge it): the
+    // human approval of the verification commands, the lock of the acceptance tests,
+    // whether evidence gates are enforced, and the verification results per gate.
+    // Request desk: questions, bugs, enhancements submitted from the UI (request-flow.js).
+    requestsFile: path.join(stateDir, "requests.json"),
+    verificationApprovalFile: path.join(stateDir, "verification-approval.json"),
+    acceptanceLockFile: path.join(stateDir, "acceptance-lock.json"),
+    evidencePolicyFile: path.join(stateDir, "evidence-policy.json"),
+    evidenceDir: path.join(stateDir, "evidence"),
+    // Readable mirror of the evidence, for reviewers and humans (never trusted by the platform).
+    evidenceMirrorDir: path.join(livrablesDir, "_governance", "evidence"),
+    // Written by @qa at G4: how to build/test the product, and the acceptance tests per US.
+    verificationConfigFile: path.join(livrablesDir, "07-tests", "verification.json"),
+    acceptanceManifestFile: path.join(livrablesDir, "07-tests", "acceptance", "manifest.json"),
+    // Legacy spend history (JSON array, read only) + the append-only log new runs write to.
     spendFile: path.join(stateDir, "spend.json"),
+    spendLogFile: path.join(stateDir, "spend.jsonl"),
     newNeedsFile: path.join(livrablesDir, "00-contexte", "nouveaux-besoins.md"),
     // Domain model: BC names (headings) and the cross-BC dependency order for G5 dev waves.
     boundedContextsFile: path.join(livrablesDir, "03-architecture-metier", "bounded-contexts.md"),
@@ -81,7 +100,6 @@ export function createWorkspacePaths(workspaceRootInput = defaultWorkspaceRoot) 
     // Claude Code protects the .claude/ directory from automated writes.
     agentIoDir: path.join(livrablesDir, "_governance", "agent-io"),
     pendingInputFile: path.join(livrablesDir, "_governance", "agent-io", "pending-input.json"),
-    answersFile: path.join(livrablesDir, "_governance", "agent-io", "answers.json"),
     // AI reports back the actual choices it made for delegated items.
     resolutionsFile: path.join(livrablesDir, "_governance", "agent-io", "resolutions.json"),
     // AI registers/updates risks it raises (mirrors pending-input.json → decisions).

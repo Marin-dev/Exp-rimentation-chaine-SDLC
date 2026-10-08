@@ -4,12 +4,12 @@ import { classifyDoc, phaseDocTypes } from "../domain/doc-types.js";
 import { PHASE_INSTRUCTIONS } from "../domain/instructions.js";
 import { PROFILES, PROFILE_BY_ID } from "../domain/profiles.js";
 import { readGates } from "./gates.js";
-import { closePassedPhaseTasks } from "./coordination.js";
 import { listDeliverables, countDocsByFolders } from "./deliverables.js";
 import { readProject } from "./project.js";
 import { listAgents } from "./agents.js";
 import { listSkills, listMcpServers } from "./resources.js";
 import { readAudits } from "./audit-decisions.js";
+import { openRequestsCount } from "./request-flow.js";
 import { readTextSafe, statSafe } from "./fs-utils.js";
 import fs from "node:fs";
 
@@ -42,10 +42,9 @@ export async function buildProjectState(config) {
   const paths = createWorkspacePaths(config.workspaceRoot);
   const workspaceExists = fs.existsSync(paths.workspaceRoot);
 
+  // Read-only: closing the tasks of passed gates happens when a run ends (run hooks) and
+  // at startup — not on every state read.
   const gates = readGates(paths);
-  // Convergence: close out tasks of any phase whose gate has passed, BEFORE reading the
-  // task register below — a finished phase stops dragging a backlog. Idempotent.
-  try { closePassedPhaseTasks(paths); } catch {}
   const deliverables = listDeliverables(paths);
   // Tag every deliverable with its typology (Epics, User Stories, …).
   for (const group of deliverables) {
@@ -150,6 +149,10 @@ export async function buildProjectState(config) {
       policies: config.policies || { libraries: { mode: "ask", allowed: [] } },
       permissionMode: config.permissionMode || "bypassPermissions",
       autopilot: config.autopilot || null,
+      runLimits: config.runLimits || { timeoutMinutes: 0, maxTurns: 0 },
+      models: config.models || { default: "", byKind: {} },
+      autoReview: config.autoReview !== false,
+      devIsolation: config.devIsolation || "shared",
       supportTemplates: config.supportTemplates || { pptx: null, docx: null }
     },
     project: {
@@ -180,7 +183,8 @@ export async function buildProjectState(config) {
       docsCount,
       decisionsPending,
       risksOpen,
-      tasksOpen
+      tasksOpen,
+      requestsOpen: openRequestsCount(paths)
     }
   };
 }

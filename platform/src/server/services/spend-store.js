@@ -2,31 +2,52 @@ import fs from "node:fs";
 import path from "node:path";
 import { readTextSafe } from "./fs-utils.js";
 
-/** Persist one run's cost/token record (appended to .claude/control-center/spend.json). */
-export function appendSpend(cwd, record) {
-  const file = path.join(cwd, ".claude", "control-center", "spend.json");
-  let list = [];
-  const existing = readTextSafe(file);
-  if (existing) {
-    try { list = JSON.parse(existing); } catch { list = []; }
-  }
-  if (!Array.isArray(list)) list = [];
-  list.push(record);
+/**
+ * Persist one run's cost/token record. Appended as ONE line to spend.jsonl (O(1) per run,
+ * no read-modify-write of the whole history). Older workspaces also have a spend.json
+ * array: it is still read, never rewritten.
+ */
+export function appendSpend(root, record) {
+  const file = path.join(root, ".claude", "control-center", "spend.jsonl");
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(list, null, 2), "utf8");
+    fs.appendFileSync(file, JSON.stringify(record) + "\n", "utf8");
   } catch {}
 }
 
-function readSpend(paths) {
-  const content = readTextSafe(paths.spendFile);
-  if (!content) return [];
+function statKey(file) {
   try {
-    const list = JSON.parse(content);
-    return Array.isArray(list) ? list : [];
+    const s = fs.statSync(file);
+    return `${s.size}:${s.mtimeMs}`;
   } catch {
-    return [];
+    return "none";
   }
+}
+
+// Parsed records cached on the files' size+mtime: the autopilot reads the total every tick.
+const cache = new Map();
+
+function readSpend(paths) {
+  const key = `${statKey(paths.spendFile)}|${statKey(paths.spendLogFile)}`;
+  const hit = cache.get(paths.workspaceRoot);
+  if (hit && hit.key === key) return hit.records.map((r) => ({ ...r }));
+  let records = [];
+  const legacy = readTextSafe(paths.spendFile);
+  if (legacy) {
+    try {
+      const list = JSON.parse(legacy);
+      if (Array.isArray(list)) records = list;
+    } catch {}
+  }
+  const lines = readTextSafe(paths.spendLogFile);
+  if (lines) {
+    for (const line of lines.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      try { records.push(JSON.parse(line)); } catch {}
+    }
+  }
+  cache.set(paths.workspaceRoot, { key, records });
+  return records.map((r) => ({ ...r }));
 }
 
 function bucket(map, key, rec) {
@@ -43,6 +64,11 @@ function bucket(map, key, rec) {
 /** Effective cost: Claude's reported cost if present, else computed from tokens × pricing. */
 function effectiveCost(rec, pricing) {
   if (rec.costUsd && rec.costUsd > 0) return { cost: rec.costUsd, estimated: false };
+  return costFromTokens(rec, pricing);
+}
+
+/** Cost computed from token counts × the pricing table (model, else the default model). */
+export function costFromTokens(rec, pricing) {
   const models = (pricing && pricing.models) || {};
   // Older records may carry a dated model id (e.g. claude-opus-4-8-20260101); normalize it.
   const modelKey = (rec.model || "").replace(/-\d{8}$/, "");

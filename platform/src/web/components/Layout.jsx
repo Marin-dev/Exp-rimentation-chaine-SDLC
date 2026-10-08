@@ -1,5 +1,5 @@
 import React from "react";
-import { Home, Inbox, GitBranch, FileText, Settings, Rocket, Server, GitFork, Wallet, History, Loader2, Compass, ShieldAlert, ListChecks } from "lucide-react";
+import { Home, Inbox, GitBranch, FileText, Settings, Rocket, Server, GitFork, Wallet, History, Loader2, Compass, ShieldAlert, ListChecks, MessageSquarePlus } from "lucide-react";
 import ProfileSwitcher from "./ProfileSwitcher.jsx";
 
 /** Header indicator: which agents are running right now, across the whole app. */
@@ -40,6 +40,7 @@ const NAV = [
     group: "Pilotage",
     items: [
       { id: "dashboard", label: "Accueil", Icon: Home },
+      { id: "requests", label: "Demandes", Icon: MessageSquarePlus, badge: "requests" },
       { id: "orchestrator", label: "Orchestrateur", Icon: Compass },
       { id: "decisions", label: "Décisions", Icon: Inbox, badge: "pending" },
       { id: "risks", label: "Risques", Icon: ShieldAlert, badge: "risks" },
@@ -85,11 +86,13 @@ export default function Layout({
   activeRuns,
   onOpenPhase,
   onOpenRun,
+  onNewRequest,
   children
 }) {
   const pending = state?.summary?.decisionsPending || 0;
   const risksOpen = state?.summary?.risksOpen || 0;
   const tasksOpen = state?.summary?.tasksOpen || 0;
+  const requestsOpen = state?.summary?.requestsOpen || 0;
 
   return (
     <div className="grid grid-cols-[256px_1fr] h-screen">
@@ -126,6 +129,11 @@ export default function Layout({
                     {risksOpen}
                   </span>
                 ) : null}
+                {item.badge === "requests" && requestsOpen > 0 ? (
+                  <span className="ml-auto bg-[#0891b2] text-white rounded-full px-2 text-[11px] font-semibold">
+                    {requestsOpen}
+                  </span>
+                ) : null}
                 {item.badge === "tasks" && tasksOpen > 0 ? (
                   <span className="ml-auto bg-secondary text-white rounded-full px-2 text-[11px] font-semibold">
                     {tasksOpen}
@@ -154,6 +162,11 @@ export default function Layout({
             {crumb ? <div className="text-ey-gray01 text-[12px]">{crumb}</div> : null}
           </div>
           <div className="flex-1" />
+          {onNewRequest ? (
+            <button className="btn btn-sm gap-1.5 bg-base-100 border-ey-border" onClick={onNewRequest} title="Poser une question, signaler une anomalie, demander une évolution">
+              <MessageSquarePlus size={15} /> Nouvelle demande
+            </button>
+          ) : null}
           <ActiveRunsIndicator runs={activeRuns} onOpenRun={onOpenRun} />
           {state?.profiles ? (
             <ProfileSwitcher

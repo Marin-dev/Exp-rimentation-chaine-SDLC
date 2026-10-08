@@ -6,7 +6,11 @@ import { createAgent } from "../services/agents.js";
 import { searchExistingSkills } from "../services/skill-discovery.js";
 import { createDecision, answerDecision, readRunAnswers, reopenDecision, markDecisionsApplied, markDecisionsAppliedByIds, listDecisions } from "../services/decisions-store.js";
 import { createWorkspacePaths, frameworkRoot } from "../config/paths.js";
-import { startRun, getRun, subscribe, listRuns } from "../services/runs.js";
+import { startRun, getRun, subscribe, listRuns, cancelRun } from "../services/runs.js";
+import { launchPhase, launchReview, launchRemediation, launchAcceptanceTests } from "../services/phase-runs.js";
+import { resumeRun } from "../services/run-resume.js";
+import { listRequests, getRequest, submitRequest, commentRequest, retryRequest, cancelRequest, setRequestPriority, reconcileRequests, REQUEST_STEP_LABELS } from "../services/request-flow.js";
+import { verificationOverview, approveVerification, setEvidencePolicy, startVerification, enforceAllEvidenceGates } from "../services/verification.js";
 import { buildG0Prompt, buildResumePrompt, buildPhasePrompt, buildReviewPrompt, buildRemediationPrompt, buildChatPrompt, buildNewNeedPrompt, buildOrchestratorChatPrompt, buildAppDetectPrompt, buildRiskSeedPrompt, buildRiskResolutionPrompt, buildTaskBatchPrompt, libraryPolicyText } from "../services/run-prompts.js";
 import { ingestPendingInput, ingestResolutions, ingestRisks, ingestTasks } from "../services/inbox-ingest.js";
 import { listRisks, createRisk, updateRiskStatus, getRisk } from "../services/risks-store.js";
@@ -33,7 +37,7 @@ import { pickFolder } from "../services/folder-picker.js";
 import { gitStatus, gitAction } from "../services/git-service.js";
 import { githubStatus, publish as githubPublish } from "../services/github-publish.js";
 import { PHASE_BY_ID, PRODUCERS, REVIEWERS, PHASE_PARALLEL } from "../domain/phases.js";
-import { startPhaseGroup, getGroup, listGroups } from "../services/group-runner.js";
+import { startPhaseGroup, getGroup, listGroups, cancelGroup } from "../services/group-runner.js";
 import { buildDevBatches, buildUsReport } from "../services/dev-batches.js";
 import { resolveViaAgent, resolveManyViaAgent } from "../services/resolve-via-agent.js";
 import { auditProfileDecisions, auditGlobalCoherence } from "../services/audit-decisions.js";
@@ -174,6 +178,23 @@ export async function handleApi(req, res, url) {
       if (body.permissionMode === "bypassPermissions" || body.permissionMode === "acceptEdits") {
         patch.permissionMode = body.permissionMode;
       }
+      if (body.runLimits && typeof body.runLimits === "object") {
+        const n = (v) => Math.max(0, Math.floor(Number(v) || 0));
+        patch.runLimits = { timeoutMinutes: n(body.runLimits.timeoutMinutes), maxTurns: n(body.runLimits.maxTurns) };
+      }
+      if (body.models && typeof body.models === "object") {
+        const clean = (v) => {
+          const t = String(v || "").trim();
+          return /^[A-Za-z0-9._\-[\]]*$/.test(t) ? t : "";
+        };
+        const byKind = {};
+        for (const [k, v] of Object.entries(body.models.byKind || {})) {
+          if (/^[a-z-]+$/.test(k) && clean(v)) byKind[k] = clean(v);
+        }
+        patch.models = { default: clean(body.models.default), byKind };
+      }
+      if (typeof body.autoReview === "boolean") patch.autoReview = body.autoReview;
+      if (body.devIsolation === "worktree" || body.devIsolation === "shared") patch.devIsolation = body.devIsolation;
       if (body.autopilot && typeof body.autopilot === "object") {
         // Merge onto the existing autopilot policy so partial edits (e.g. just the budget)
         // don't wipe the rest, and never let a settings save flip the run flag.
@@ -277,6 +298,8 @@ export async function handleApi(req, res, url) {
         sendJson(res, 400, result);
         return true;
       }
+      // A pilot's decision on a request of the desk lets that request continue.
+      try { reconcileRequests(config, paths); } catch {}
       // Auto-approve the library in the policy allowlist.
       if (result.approvedLibrary) {
         const libs = (config.policies && config.policies.libraries && config.policies.libraries.allowed) || [];
@@ -934,16 +957,13 @@ export async function handleApi(req, res, url) {
       const sourcesIndex = readSourcesIndex(paths);
       const hasSources = Boolean(sourcesIndex && sourcesIndex.validatedAt);
       const intakePath = String(body.intakePath || "").trim() || (sourcesIndex ? sourcesIndex.sourceFolder : "");
-      const hasAnswers = fs.existsSync(paths.answersFile);
       const runId = startRun(config, {
         label: "G0 · Structuration du besoin",
         kind: "g0",
         phaseId: "G0",
         agent: PHASE_AGENTS.G0,
-        prompt: buildG0Prompt({ intakePath, hasAnswers, hasSources }) + libraryPolicyText(config),
-        cwd: paths.workspaceRoot,
-        onDone: (run) =>
-          ingestPendingInput(paths, { runId: run.id, phaseId: "G0", raisedBy: PHASE_AGENTS.G0 })
+        prompt: buildG0Prompt({ intakePath, hasSources }) + libraryPolicyText(config),
+        cwd: paths.workspaceRoot
       });
       sendJson(res, 200, { ok: true, runId });
       return true;
@@ -960,26 +980,8 @@ export async function handleApi(req, res, url) {
         sendJson(res, 400, { ok: false, error: "Étape invalide pour ce lancement." });
         return true;
       }
-      const hasAnswers = fs.existsSync(paths.answersFile);
-      const runId = startRun(config, {
-        label: `${phase.id} · ${phase.title}`,
-        kind: "phase",
-        phaseId,
-        agent: PHASE_AGENTS[phaseId] || null,
-        prompt:
-          buildPhasePrompt(phase, { hasAnswers, inputs: pendingInputsForPhase(paths, phaseId) }) +
-          libraryPolicyText(config),
-        cwd: paths.workspaceRoot,
-        onDone: (run) => {
-          ingestResolutions(paths);
-          // Only mark inputs consumed if the agent actually completed — a failed run never read them.
-          if (run.status === "done") markPhaseInputsConsidered(paths, phaseId);
-          ingestRisks(paths, { runId: run.id, phaseId, raisedBy: PHASE_AGENTS[phaseId] });
-          ingestTasks(paths, { runId: run.id, phaseId, raisedBy: PHASE_AGENTS[phaseId] });
-          return ingestPendingInput(paths, { runId: run.id, phaseId, raisedBy: PHASE_AGENTS[phaseId] });
-        }
-      });
-      sendJson(res, 200, { ok: true, runId });
+      const r = launchPhase(config, paths, phaseId, { agent: PHASE_AGENTS[phaseId] || null });
+      sendJson(res, r.ok ? 200 : 400, r);
       return true;
     }
 
@@ -1051,23 +1053,9 @@ export async function handleApi(req, res, url) {
         sendJson(res, 400, { ok: false, error: "Étape inconnue." });
         return true;
       }
-      const agent = PRODUCERS[phaseId] || PHASE_AGENTS[phaseId] || null;
-      const gateStatus = (readGates(paths)[phaseId] || {}).status || null;
-      const runId = startRun(config, {
-        label: `${phase.id} · Correction des points bloquants`,
-        kind: "remediation",
-        phaseId,
-        agent,
-        prompt: buildRemediationPrompt(phase, agent, gateStatus) + libraryPolicyText(config),
-        cwd: paths.workspaceRoot,
-        onDone: (run) => {
-          ingestResolutions(paths);
-          ingestRisks(paths, { runId: run.id, phaseId, raisedBy: agent || "Correction" });
-          ingestTasks(paths, { runId: run.id, phaseId, raisedBy: agent || "Correction" });
-          ingestPendingInput(paths, { runId: run.id, phaseId, raisedBy: agent || "Correction" });
-        }
-      });
-      sendJson(res, 200, { ok: true, runId });
+      // The producer fixes; the reviewer (chained automatically) re-decides the gate.
+      const r = launchRemediation(config, paths, phaseId);
+      sendJson(res, r.ok ? 200 : 400, r);
       return true;
     }
 
@@ -1083,20 +1071,8 @@ export async function handleApi(req, res, url) {
         sendJson(res, 400, { ok: false, error: "Pas de revue définie pour cette étape." });
         return true;
       }
-      const runId = startRun(config, {
-        label: `${phase.id} · Revue (${reviewer})`,
-        kind: "review",
-        phaseId,
-        agent: reviewer,
-        prompt: buildReviewPrompt(phase, reviewer),
-        cwd: paths.workspaceRoot,
-        onDone: (run) => {
-          ingestRisks(paths, { runId: run.id, phaseId, raisedBy: reviewer });
-          ingestTasks(paths, { runId: run.id, phaseId, raisedBy: reviewer });
-          return ingestPendingInput(paths, { runId: run.id, phaseId, raisedBy: reviewer });
-        }
-      });
-      sendJson(res, 200, { ok: true, runId });
+      const r = launchReview(config, paths, phaseId);
+      sendJson(res, r.ok ? 200 : 400, r);
       return true;
     }
 
@@ -1327,36 +1303,9 @@ export async function handleApi(req, res, url) {
         sendJson(res, 400, { ok: false, error: "Étape inconnue pour la reprise." });
         return true;
       }
-      const answers = readRunAnswers(paths, fromRunId);
-      if (!answers.length) {
-        sendJson(res, 400, { ok: false, error: "Aucune réponse à transmettre." });
-        return true;
-      }
-      fs.mkdirSync(paths.stateDir, { recursive: true });
-      fs.writeFileSync(paths.answersFile, JSON.stringify(answers, null, 2), "utf8");
-      const phase = phaseId ? PHASE_BY_ID[phaseId] : null;
-      const isNeed = !phaseId;
-      const agent = phaseId ? PHASE_AGENTS[phaseId] || null : "@project-bootstrapper";
-      const runId = startRun(config, {
-        label: isNeed ? "Nouveau besoin · Reprise après réponses" : `${phaseId} · Reprise après réponses`,
-        kind: "resume",
-        phaseId,
-        agent,
-        prompt: buildResumePrompt({
-          phaseLabel: isNeed ? "la prise en compte du nouveau besoin (propagation vers domaine, technique, UX, backlog)" : `${phase.id} ${phase.title}`,
-          agent: agent || ""
-        }) + libraryPolicyText(config),
-        cwd: paths.workspaceRoot,
-        onDone: (run) => {
-          ingestResolutions(paths);
-          const result = ingestPendingInput(paths, { runId: run.id, phaseId, raisedBy: agent || "Reprise" });
-          // The raising agent has re-run and integrated the answers -> mark them applied.
-          if (run.status === "done") markDecisionsApplied(paths, fromRunId);
-          try { fs.rmSync(paths.answersFile, { force: true }); } catch {}
-          return result;
-        }
-      });
-      sendJson(res, 200, { ok: true, runId });
+      // The agent that asked resumes its own session (same scope, same files).
+      const r = resumeRun(config, paths, fromRunId, { phaseId, agent: phaseId ? PHASE_AGENTS[phaseId] || null : "@project-bootstrapper" });
+      sendJson(res, r.ok ? 200 : 400, r);
       return true;
     }
 
@@ -1374,6 +1323,90 @@ export async function handleApi(req, res, url) {
         .filter((g) => g.status === "running")
         .map((g) => ({ groupId: g.id, phaseId: g.phaseId, agents: g.agents }));
       sendJson(res, 200, { ok: true, runs, groups });
+      return true;
+    }
+
+    // ---- Request desk: questions, bugs, enhancements submitted by anyone ----
+    if (pathname === "/api/requests" && req.method === "GET") {
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      try { reconcileRequests(config, paths); } catch {}
+      sendJson(res, 200, { ok: true, requests: listRequests(paths), steps: REQUEST_STEP_LABELS });
+      return true;
+    }
+    if (pathname === "/api/requests" && req.method === "POST") {
+      const body = await readBody(req);
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      const r = submitRequest(config, paths, { text: body.text, by: body.by });
+      sendJson(res, r.ok ? 200 : 400, r.ok ? { ...r, request: getRequest(paths, r.id) } : r);
+      return true;
+    }
+    const requestAction = pathname.match(/^\/api\/requests\/(REQ-\d+)\/(comment|retry|cancel|priority)$/);
+    if (requestAction && req.method === "POST") {
+      const body = await readBody(req);
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      const id = requestAction[1];
+      const action = requestAction[2];
+      const r = action === "comment" ? commentRequest(config, paths, { id, text: body.text, by: body.by })
+        : action === "retry" ? retryRequest(config, paths, { id })
+        : action === "cancel" ? cancelRequest(paths, { id })
+        : setRequestPriority(paths, { id, priority: body.priority });
+      sendJson(res, r.ok ? 200 : 400, r.ok ? { ...r, request: getRequest(paths, id) } : r);
+      return true;
+    }
+
+    // ---- Executable evidence (G4 acceptance tests, G5 / G6 verification) ----
+    if (pathname === "/api/verification" && req.method === "GET") {
+      const paths = createWorkspacePaths(loadConfig().workspaceRoot);
+      sendJson(res, 200, { ok: true, ...verificationOverview(paths) });
+      return true;
+    }
+    if (pathname === "/api/verification/approve" && req.method === "POST") {
+      const body = await readBody(req);
+      const paths = createWorkspacePaths(loadConfig().workspaceRoot);
+      const r = approveVerification(paths, { hash: String(body.hash || ""), by: String(body.by || "") || null });
+      sendJson(res, r.ok ? 200 : 400, r.ok ? { ok: true, ...verificationOverview(paths) } : r);
+      return true;
+    }
+    if (pathname === "/api/verification/policy" && req.method === "POST") {
+      const body = await readBody(req);
+      const paths = createWorkspacePaths(loadConfig().workspaceRoot);
+      setEvidencePolicy(paths, Boolean(body.enabled));
+      // Turning it on applies at once: a passed G5 / G6 without evidence goes back to FAIL.
+      enforceAllEvidenceGates(paths);
+      sendJson(res, 200, { ok: true, ...verificationOverview(paths) });
+      return true;
+    }
+    if (pathname === "/api/verification/run" && req.method === "POST") {
+      const body = await readBody(req);
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      const r = startVerification(config, paths, String(body.gateId || "").toUpperCase());
+      sendJson(res, r.ok ? 200 : 400, r);
+      return true;
+    }
+    if (pathname === "/api/acceptance/launch" && req.method === "POST") {
+      const config = loadConfig();
+      const paths = createWorkspacePaths(config.workspaceRoot);
+      const r = launchAcceptanceTests(config, paths);
+      sendJson(res, r.ok ? 200 : 400, r);
+      return true;
+    }
+
+    const groupCancel = pathname.match(/^\/api\/runs\/group\/([^/]+)\/cancel$/);
+    if (groupCancel && req.method === "POST") {
+      const r = cancelGroup(decodeURIComponent(groupCancel[1]), "Arrêt demandé par l'utilisateur.");
+      sendJson(res, r.ok ? 200 : 400, r);
+      return true;
+    }
+
+    // Stop a running agent (by its PID tree — never by process name).
+    const cancelMatch = pathname.match(/^\/api\/runs\/([^/]+)\/cancel$/);
+    if (cancelMatch && req.method === "POST") {
+      const r = cancelRun(decodeURIComponent(cancelMatch[1]), "Arrêt demandé par l'utilisateur.");
+      sendJson(res, r.ok ? 200 : 400, r);
       return true;
     }
 

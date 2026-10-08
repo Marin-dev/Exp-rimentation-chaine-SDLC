@@ -59,6 +59,7 @@ import ParallelRunView from "../components/ParallelRunView.jsx";
 import PhaseInputs from "../components/PhaseInputs.jsx";
 import SupportsPanel from "../components/SupportsPanel.jsx";
 import UsReport from "../components/UsReport.jsx";
+import EvidencePanel from "../components/EvidencePanel.jsx";
 
 function ItemRow({ d, onOpen, selectable, selected, onToggle }) {
   const Icon = d.type === "question" ? HelpCircle : Scale;
@@ -129,7 +130,8 @@ export default function PhaseScreen({
   onBulkDone,
   onStateRefresh,
   onStateChange,
-  onStartImpact
+  onStartImpact,
+  onRunStarted
 }) {
   const idx = state.phases.findIndex((p) => p.id === phaseId);
   const phase = state.phases[idx];
@@ -417,6 +419,16 @@ export default function PhaseScreen({
 
       {/* Rapport de développement des User Stories (zone dev G5) */}
       {isG5 ? <UsReport version={docCount} onOpenDoc={setOpenDoc} /> : null}
+
+      {/* Tests d'acceptation (G4) et preuves exécutables des gates (G5, G6) */}
+      <EvidencePanel
+        phaseId={phaseId}
+        profile={profile}
+        busy={Boolean(liveRun || liveGroup)}
+        refreshKey={`${(liveRun && liveRun.id) || (liveGroup && liveGroup.groupId) || "idle"}-${phase.gateStatus}`}
+        onRunStarted={onRunStarted}
+        onStateRefresh={onStateRefresh}
+      />
 
       {/* Tâches ouvertes rattachées à cette étape */}
       <PhaseTasks phaseId={phaseId} tasks={state.tasks || []} onNavigate={onNavigate} />

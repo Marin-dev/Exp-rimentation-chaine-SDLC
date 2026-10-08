@@ -13,7 +13,8 @@ import {
   X,
   FolderPlus,
   Rocket,
-  Gauge
+  Gauge,
+  Timer
 } from "lucide-react";
 import { Api } from "../api.js";
 import { Card, EmptyState, useEscToClose } from "../components/ui.jsx";
@@ -174,6 +175,125 @@ function ExecutionModeCard({ state, onStateChange }) {
   );
 }
 
+const RUN_KINDS = [
+  { id: "plan", label: "Planification de l'autopilote" },
+  { id: "review", label: "Revues de gate" },
+  { id: "resolution", label: "Décisions déléguées aux experts" },
+  { id: "chat", label: "Chats" }
+];
+
+function RunSettingsCard({ state, onStateChange }) {
+  const cfg = state.config || {};
+  const [timeoutMinutes, setTimeoutMinutes] = useState(cfg.runLimits?.timeoutMinutes ?? 120);
+  const [maxTurns, setMaxTurns] = useState(cfg.runLimits?.maxTurns ?? 0);
+  const [defaultModel, setDefaultModel] = useState(cfg.models?.default || "");
+  const [byKind, setByKind] = useState({ ...(cfg.models?.byKind || {}) });
+  const [autoReview, setAutoReview] = useState(cfg.autoReview !== false);
+  const [devIsolation, setDevIsolation] = useState(cfg.devIsolation || "shared");
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    setSaved(false);
+    try {
+      const next = await Api.setRunSettings({
+        runLimits: { timeoutMinutes: Number(timeoutMinutes) || 0, maxTurns: Number(maxTurns) || 0 },
+        models: { default: defaultModel.trim(), byKind },
+        autoReview,
+        devIsolation
+      });
+      onStateChange(next);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="p-5 mb-4">
+      <h3 className="text-base font-bold mt-0 mb-1 flex items-center gap-2">
+        <Timer size={17} className="text-ey-gray01" /> Exécution des runs
+      </h3>
+      <p className="text-ey-gray01 text-[13px] mt-0 mb-3">
+        Bornes de chaque agent, modèle utilisé selon le type de travail, et enchaînement des revues.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <label className="block">
+          <span className="block text-[12.5px] font-semibold mb-1">Durée maximum d'un run (minutes)</span>
+          <input type="number" min="0" step="5" className="input input-bordered input-sm w-full" value={timeoutMinutes} onChange={(e) => setTimeoutMinutes(e.target.value)} />
+          <span className="block text-[11px] text-ey-gray02 mt-1">Au-delà, l'agent est arrêté. 0 = pas de limite.</span>
+        </label>
+        <label className="block">
+          <span className="block text-[12.5px] font-semibold mb-1">Tours d'agent maximum</span>
+          <input type="number" min="0" step="10" className="input input-bordered input-sm w-full" value={maxTurns} onChange={(e) => setMaxTurns(e.target.value)} />
+          <span className="block text-[11px] text-ey-gray02 mt-1">Option <code>--max-turns</code>. 0 = valeur par défaut de la CLI.</span>
+        </label>
+      </div>
+
+      <div className="mb-4">
+        <span className="block text-[12.5px] font-semibold mb-1.5">Modèles</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <label className="block">
+            <span className="block text-[12px] text-ey-gray01 mb-1">Par défaut</span>
+            <input className="input input-bordered input-sm w-full" placeholder="défaut de la CLI" value={defaultModel} onChange={(e) => setDefaultModel(e.target.value)} />
+          </label>
+          {RUN_KINDS.map((k) => (
+            <label key={k.id} className="block">
+              <span className="block text-[12px] text-ey-gray01 mb-1">{k.label}</span>
+              <input
+                className="input input-bordered input-sm w-full"
+                placeholder="modèle par défaut"
+                value={byKind[k.id] || ""}
+                onChange={(e) => setByKind((cur) => ({ ...cur, [k.id]: e.target.value }))}
+              />
+            </label>
+          ))}
+        </div>
+        <span className="block text-[11px] text-ey-gray02 mt-1">Alias acceptés par la CLI : <code>opus</code>, <code>sonnet</code>, <code>haiku</code>, ou un identifiant complet.</span>
+      </div>
+
+      <label className="flex items-start gap-2.5 cursor-pointer mb-3">
+        <input type="checkbox" className="checkbox checkbox-sm mt-0.5" checked={autoReview} onChange={(e) => setAutoReview(e.target.checked)} />
+        <span>
+          <b className="text-[13.5px]">Revue automatique après production</b>
+          <span className="block text-[12.5px] text-ey-gray01">
+            Après un agent producteur ou une correction, le reviewer de l'étape est lancé et décide le gate. Le producteur ne valide jamais son propre travail.
+          </span>
+        </span>
+      </label>
+
+      <div className="mb-3">
+        <span className="block text-[12.5px] font-semibold mb-1.5">Dev par batch : isolation des lanes parallèles</span>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input type="radio" className="radio radio-sm mt-0.5" checked={devIsolation === "shared"} onChange={() => setDevIsolation("shared")} />
+            <span>
+              <b className="text-[13.5px]">Dossier partagé</b>
+              <span className="block text-[12.5px] text-ey-gray01">Les lanes travaillent dans le même dossier ; un contrôle d'intégration (build et tests) suit chaque vague.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input type="radio" className="radio radio-sm mt-0.5" checked={devIsolation === "worktree"} onChange={() => setDevIsolation("worktree")} />
+            <span>
+              <b className="text-[13.5px]">Un worktree git par lane</b>
+              <span className="block text-[12.5px] text-ey-gray01">
+                Chaque lane a sa copie et sa branche, fusionnées après la vague. Crée un commit local du workspace avant chaque vague ; un conflit arrête le groupe et ouvre un risque. Rien n'est poussé.
+              </span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>
+        {saved ? "Enregistré" : busy ? "Enregistrement…" : "Enregistrer les réglages"}
+      </button>
+    </Card>
+  );
+}
+
 const ESCALATION_MODES = [
   { id: "expert-blocked", label: "Seulement si l'expert est bloqué", hint: "L'agent expert tranche par défaut ; tu n'es sollicité que s'il ne peut pas décider seul." },
   { id: "structural", label: "Décisions structurantes / irréversibles", hint: "Les choix courants sont délégués ; les choix structurants ou irréversibles remontent vers toi." },
@@ -231,7 +351,7 @@ function AutopilotSettingsCard({ state, onStateChange }) {
         <label className="block">
           <span className="block text-[12.5px] font-semibold mb-1">Agents simultanés</span>
           <input type="number" min="1" step="1" className="input input-bordered input-sm w-full" value={maxConcurrent} onChange={(e) => setMaxConcurrent(e.target.value)} />
-          <span className="block text-[11px] text-ey-gray02 mt-1">Runs lancés en parallèle avant de planifier la suite.</span>
+          <span className="block text-[11px] text-ey-gray02 mt-1">Agents au travail en même temps au maximum (chaque lane d'un dev par batch compte).</span>
         </label>
       </div>
 
@@ -658,6 +778,9 @@ export default function SettingsScreen({ state, onStateChange }) {
 
       {/* Autopilot */}
       <AutopilotSettingsCard state={state} onStateChange={onStateChange} />
+
+      {/* Run limits, models, review chaining, dev lane isolation */}
+      <RunSettingsCard state={state} onStateChange={onStateChange} />
 
       {/* Execution / permission mode */}
       <ExecutionModeCard state={state} onStateChange={onStateChange} />

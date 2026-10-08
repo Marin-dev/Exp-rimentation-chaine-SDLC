@@ -3,46 +3,26 @@ import path from "node:path";
 import { startRun } from "./runs.js";
 import { startPhaseGroup } from "./group-runner.js";
 import { buildDevBatches } from "./dev-batches.js";
-import {
-  buildPhasePrompt,
-  buildReviewPrompt,
-  buildRemediationPrompt,
-  buildRiskSeedPrompt,
-  buildDirectedAgentPrompt,
-  libraryPolicyText
-} from "./run-prompts.js";
-import { ingestPendingInput, ingestResolutions, ingestRisks, ingestTasks } from "./inbox-ingest.js";
-import { pendingInputsForPhase, markPhaseInputsConsidered } from "./inputs-store.js";
-import { readGates } from "./gates.js";
+import { buildRiskSeedPrompt, buildDirectedAgentPrompt, libraryPolicyText } from "./run-prompts.js";
+import { launchPhase, launchReview, launchRemediation, launchAcceptanceTests } from "./phase-runs.js";
+import { startVerification } from "./verification.js";
 import { readTextSafe } from "./fs-utils.js";
 import { createTask, listTasks, getTask, updateTaskStatus, actionSignature, OPEN_TASK_STATUSES } from "./tasks-store.js";
 import { PHASE_BY_ID, PRODUCERS, REVIEWERS } from "../domain/phases.js";
 import { PROFILE_BY_ID } from "../domain/profiles.js";
 
 /**
- * Execute an action the orchestrator PROPOSED and the human CONFIRMED.
+ * Execute an action the orchestrator PROPOSED and the human CONFIRMED (or the autopilot
+ * launched).
  * Every action routes through the same run/group machinery the phase-screen
  * buttons use — the orchestrator never gets a private, unaudited execution path.
  * Returns { ok, runId?, groupId?, label?, error? }.
  */
-/** Short filesystem-safe token to give each run its OWN agent-io files (no collisions). */
-function ioToken(label) {
-  const base = String(label || "dev")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 32) || "dev";
-  return `${base}-${Date.now().toString(36)}`;
-}
-
 export function executeOrchestratorAction(config, paths, action) {
   const type = String(action?.type || "").trim();
   const phaseId = String(action?.phaseId || "").trim();
   const phase = phaseId ? PHASE_BY_ID[phaseId] : null;
   const label = String(action?.label || "").trim();
-  const hasAnswers = fs.existsSync(paths.answersFile);
 
   switch (type) {
     case "launch_dev": {
@@ -50,94 +30,29 @@ export function executeOrchestratorAction(config, paths, action) {
       const instruction = String(action.instruction || "").trim();
       if (!instruction) return { ok: false, error: "Action launch_dev sans instruction." };
       const pid = phase ? phaseId : "G5";
-      // Per-run agent-io files so parallel launch_dev runs never overwrite each other's
-      // pending questions / risks (the shared default files collide under concurrency).
-      const token = ioToken(label || agent);
-      const pendingRel = `livrables/_governance/agent-io/pending-input-${token}.json`;
-      const pendingAbs = path.join(paths.agentIoDir, `pending-input-${token}.json`);
-      const risksRel = `livrables/_governance/agent-io/risks-${token}.json`;
-      const risksAbs = path.join(paths.agentIoDir, `risks-${token}.json`);
-      const tasksRel = `livrables/_governance/agent-io/tasks-${token}.json`;
-      const tasksAbs = path.join(paths.agentIoDir, `tasks-${token}.json`);
+      // The default agent-io names in the prompt are rewritten to this run's own files by
+      // the run engine, and ingested by the run hooks — also after a server restart.
       const runId = startRun(config, {
         label: label || `${agent} · ${pid}`,
         kind: "orchestrated",
         phaseId: pid,
         agent,
-        prompt: buildDirectedAgentPrompt({ agent, instruction, phaseId: pid, pendingFileRel: pendingRel, risksFileRel: risksRel, tasksFileRel: tasksRel }) + libraryPolicyText(config),
-        cwd: paths.workspaceRoot,
-        // Recorded in the active-runs registry so a reconcile after a restart ingests
-        // THESE files, not the shared defaults.
-        pendingFile: pendingAbs,
-        risksFile: risksAbs,
-        onDone: (run) => {
-          ingestResolutions(paths);
-          ingestRisks(paths, { runId: run.id, phaseId: pid, raisedBy: agent }, risksAbs);
-          ingestTasks(paths, { runId: run.id, phaseId: pid, raisedBy: agent }, tasksAbs);
-          return ingestPendingInput(paths, { runId: run.id, phaseId: pid, raisedBy: agent }, pendingAbs);
-        }
+        prompt: buildDirectedAgentPrompt({ agent, instruction, phaseId: pid }) + libraryPolicyText(config),
+        cwd: paths.workspaceRoot
       });
       return { ok: true, runId, label: label || `${agent} · ${pid}` };
     }
 
-    case "launch_phase": {
-      if (!phase || phaseId === "G0") return { ok: false, error: "Étape invalide pour un lancement." };
-      const agent = PRODUCERS[phaseId] || null;
-      const runId = startRun(config, {
-        label: `${phase.id} · ${phase.title}`,
-        kind: "phase",
-        phaseId,
-        agent,
-        prompt: buildPhasePrompt(phase, { hasAnswers, inputs: pendingInputsForPhase(paths, phaseId) }) + libraryPolicyText(config),
-        cwd: paths.workspaceRoot,
-        onDone: (run) => {
-          ingestResolutions(paths);
-          if (run.status === "done") markPhaseInputsConsidered(paths, phaseId);
-          ingestRisks(paths, { runId: run.id, phaseId, raisedBy: agent });
-          return ingestPendingInput(paths, { runId: run.id, phaseId, raisedBy: agent });
-        }
-      });
-      return { ok: true, runId, label: `${phase.id} · ${phase.title}` };
-    }
+    case "launch_phase":
+      return launchPhase(config, paths, phaseId);
 
     case "launch_review": {
-      const reviewer = REVIEWERS[phaseId];
-      if (!phase || !reviewer) return { ok: false, error: "Pas de revue définie pour cette étape." };
-      const runId = startRun(config, {
-        label: `${phase.id} · Revue (${reviewer})`,
-        kind: "review",
-        phaseId,
-        agent: reviewer,
-        prompt: buildReviewPrompt(phase, reviewer),
-        cwd: paths.workspaceRoot,
-        onDone: (run) => {
-          ingestRisks(paths, { runId: run.id, phaseId, raisedBy: reviewer });
-          return ingestPendingInput(paths, { runId: run.id, phaseId, raisedBy: reviewer });
-        }
-      });
-      return { ok: true, runId, label: `${phase.id} · Revue` };
+      const r = launchReview(config, paths, phaseId);
+      return r.ok ? { ...r, label: `${phaseId} · Revue` } : r;
     }
 
-    case "remediate": {
-      if (!phase) return { ok: false, error: "Étape inconnue." };
-      const agent = PRODUCERS[phaseId] || null;
-      const gate = readGates(paths)[phaseId];
-      const gateStatus = gate ? gate.status : null;
-      const runId = startRun(config, {
-        label: `${phase.id} · Correction des risques`,
-        kind: "remediation",
-        phaseId,
-        agent,
-        prompt: buildRemediationPrompt(phase, agent, gateStatus) + libraryPolicyText(config),
-        cwd: paths.workspaceRoot,
-        onDone: (run) => {
-          ingestResolutions(paths);
-          ingestRisks(paths, { runId: run.id, phaseId, raisedBy: agent || "Correction" });
-          return ingestPendingInput(paths, { runId: run.id, phaseId, raisedBy: agent || "Correction" });
-        }
-      });
-      return { ok: true, runId, label: `${phase.id} · Correction des risques` };
-    }
+    case "remediate":
+      return launchRemediation(config, paths, phaseId);
 
     case "launch_dev_batches": {
       const g5 = PHASE_BY_ID.G5;
@@ -147,15 +62,21 @@ export function executeOrchestratorAction(config, paths, action) {
       return { ok: true, groupId, meta, label: "G5 · Dev par batch (BC)" };
     }
 
+    case "write_acceptance_tests":
+      return launchAcceptanceTests(config, paths);
+
+    case "run_verification": {
+      const gate = phaseId === "G6" ? "G6" : "G5";
+      return startVerification(config, paths, gate);
+    }
+
     case "seed_risks": {
-      try { fs.rmSync(paths.risksInboxFile, { force: true }); } catch {}
       const runId = startRun(config, {
         label: "Amorçage du registre des risques · @qa",
         kind: "risk-seed",
         agent: "@qa",
         prompt: buildRiskSeedPrompt() + libraryPolicyText(config),
-        cwd: paths.workspaceRoot,
-        onDone: () => ingestRisks(paths, { raisedBy: "@qa" })
+        cwd: paths.workspaceRoot
       });
       return { ok: true, runId, label: "Amorçage du registre des risques" };
     }
@@ -184,6 +105,8 @@ function profileForAction(action) {
     case "remediate": return profileForAgent(PRODUCERS[phaseId]) || "orchestrateur";
     case "launch_review": return profileForAgent(REVIEWERS[phaseId]) || "qa";
     case "launch_dev_batches": return "developpeur";
+    case "write_acceptance_tests":
+    case "run_verification": return "qa";
     case "seed_risks": return "qa";
     default: return "orchestrateur";
   }
@@ -197,8 +120,8 @@ function profileForAction(action) {
  * by an open task (dedup by signature), so re-proposing the same step doesn't pile up.
  * Returns { created }.
  */
-export function ingestOrchestratorActionsAsTasks(paths, meta = {}) {
-  const raw = readTextSafe(paths.orchestratorActionsFile);
+export function ingestOrchestratorActionsAsTasks(paths, meta = {}, file) {
+  const raw = readTextSafe(file || paths.orchestratorActionsFile);
   if (!raw) return { created: 0 };
   let actions = [];
   try {
@@ -250,8 +173,8 @@ export function ingestOrchestratorActionsAsTasks(paths, meta = {}) {
  * Only acts on tasks that are still `proposed`, so it can never disturb work already
  * launched or done. Returns { promoted, dropped }.
  */
-export function applyOrchestratorTaskOps(paths) {
-  const raw = readTextSafe(paths.orchestratorActionsFile);
+export function applyOrchestratorTaskOps(paths, file) {
+  const raw = readTextSafe(file || paths.orchestratorActionsFile);
   if (!raw) return { promoted: 0, dropped: 0 };
   let ops = [];
   try {

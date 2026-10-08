@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Layers, Loader2, CheckCircle2 } from "lucide-react";
+import { Layers, Loader2, CheckCircle2, Square, Info } from "lucide-react";
 import { Api } from "../api.js";
 import RunConsole from "./RunConsole.jsx";
 
@@ -38,8 +38,27 @@ export default function ParallelRunView({ groupId, onDone }) {
     );
   }
 
+  async function stopGroup() {
+    if (!window.confirm("Arrêter tout le groupe ? Les agents en cours sont arrêtés et les étapes suivantes ne démarrent pas.")) return;
+    try { await Api.cancelGroup(groupId); } catch {}
+  }
+
   return (
     <div className="flex flex-col gap-4">
+      {group.status === "running" ? (
+        <div className="flex justify-end">
+          <button className="btn btn-outline btn-xs gap-1" onClick={stopGroup}>
+            <Square size={12} /> Arrêter le groupe
+          </button>
+        </div>
+      ) : null}
+      {(group.notes || []).length ? (
+        <ul className="m-0 pl-0 list-none flex flex-col gap-1 text-[12px] text-ey-gray01">
+          {group.notes.map((n, i) => (
+            <li key={i} className="flex items-start gap-1.5"><Info size={13} className="shrink-0 mt-0.5" /> {n}</li>
+          ))}
+        </ul>
+      ) : null}
       {group.stages.map((stage, i) => {
         if (stage.agents.length === 0) return null;
         const isCurrent = i === group.currentStage && group.status === "running";

@@ -65,6 +65,10 @@ function buildItem(data, input, targetProfile, title) {
     type,
     runId: input.runId ? String(input.runId) : null,
     ref: input.ref ? String(input.ref) : null,
+    // Set when the decision belongs to a request of the request desk.
+    requestId: input.requestId ? String(input.requestId) : null,
+    // A human must decide (e.g. the pilot accepting an enhancement): no delegation to an AI.
+    humanOnly: Boolean(input.humanOnly),
     library: input.library ? String(input.library).trim() : null,
     title,
     summary: String(input.summary || "").trim(),
@@ -171,6 +175,7 @@ export function answerDecision(paths, input) {
     choiceLabel = "Délégué à l'IA (au mieux)";
   }
   if (!choiceLabel) return { ok: false, error: "Réponse requise (un choix, un texte ou un document)." };
+  if (delegated && decision.humanOnly) return { ok: false, error: "Cette décision revient à un humain : elle ne peut pas être déléguée à l'IA." };
 
   decision.status = "answered";
   decision.answer = {

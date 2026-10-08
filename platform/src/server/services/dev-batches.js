@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { readEvidence, isEvidenceFresh } from "./verification.js";
 
 /**
  * Dynamic G5 dev batching by Bounded Context.
@@ -117,6 +118,10 @@ export function buildUsReport(paths) {
     return { ok: false, error: "Dossier user-stories introuvable.", total: 0, developedCount: 0, todoCount: 0, developed: [], todo: [] };
   }
   const names = readBcNames(paths);
+  // Acceptance result of each US in the last G5 verification (platform-run, not declared).
+  const ev = readEvidence(paths, "G5");
+  const fresh = ev ? isEvidenceFresh(paths, "G5", ev) : false;
+  const acceptanceOf = new Map(((ev && ev.stories) || []).map((s) => [s.us, s.status]));
   const all = files
     .map((f) => parseUS(dir, f))
     .filter(Boolean)
@@ -132,7 +137,9 @@ export function buildUsReport(paths) {
       primaryBC: u.primaryBC,
       bcName: u.primaryBC ? names[u.primaryBC] || u.primaryBC : null,
       integrationBCs: u.integrationBCs,
-      developed: isDeveloped(paths, u.id)
+      developed: isDeveloped(paths, u.id),
+      acceptance: acceptanceOf.get(u.id) || null,
+      acceptanceFresh: fresh
     };
     (row.developed ? developed : todo).push(row);
   }
@@ -144,6 +151,27 @@ export function buildUsReport(paths) {
     developed,
     todo
   };
+}
+
+/**
+ * After a wave of SEVERAL parallel lanes, one integration step builds and tests the whole
+ * product and fixes only the breaks between lanes, before the next wave builds on it.
+ */
+function pushIntegration(stages, waveMeta, lanes) {
+  if (lanes.length < 2) return;
+  const wave = waveMeta.filter((w) => w.bcs && !w.integration).length;
+  stages.push([
+    {
+      kind: "dev-integrate",
+      agentKey: `dev-integration-w${wave}`,
+      agent: "@developpeur",
+      label: `@developpeur · intégration vague ${wave}`,
+      wave,
+      lanes: lanes.map((l) => ({ bc: l.bc, bcName: l.bcName, us: l.usList.map((u) => u.id) })),
+      goal: `Builder, tester et réparer l'intégration de la vague ${wave}`
+    }
+  ]);
+  waveMeta.push({ integration: true, wave });
 }
 
 /**
@@ -198,6 +226,7 @@ export function buildDevBatches(paths) {
     if (lanes.length) {
       stages.push(lanes);
       waveMeta.push({ bcs: lanes.map((l) => ({ bc: l.bc, name: l.bcName, us: l.usList.length })) });
+      pushIntegration(stages, waveMeta, lanes);
     }
   }
 
@@ -207,6 +236,7 @@ export function buildDevBatches(paths) {
     const lanes = unknownBCs.map((bc) => makeLane(bc, byBC.get(bc), names));
     stages.push(lanes);
     waveMeta.push({ misc: true, bcs: lanes.map((l) => ({ bc: l.bc, name: l.bcName, us: l.usList.length })) });
+    pushIntegration(stages, waveMeta, lanes);
   }
 
   // Final governance consolidation lane (single task) — only if we developed anything.

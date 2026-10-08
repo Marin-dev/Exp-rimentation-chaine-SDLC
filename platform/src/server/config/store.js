@@ -13,6 +13,19 @@ const DEFAULT_CONFIG = {
   // not through the CLI's tool prompts. "acceptEdits" only auto-approves file edits (shell
   // commands still block — use only if you deliberately want agents unable to run commands).
   permissionMode: "bypassPermissions",
+  // Bounds of every agent run. timeoutMinutes: the run is stopped (by PID) past this
+  // duration — a stuck agent can't freeze the chain. maxTurns: passed as --max-turns
+  // (0 = CLI default, unlimited).
+  runLimits: { timeoutMinutes: 120, maxTurns: 0 },
+  // Model per run kind (--model). Empty = the CLI's default model. The autopilot planner
+  // ("plan") only reads a snapshot and writes a JSON plan: a lighter model is enough.
+  models: { default: "", byKind: { plan: "sonnet", "app-detect": "sonnet", "request-classify": "sonnet" } },
+  // Chain the reviewer automatically after a producer / remediation run of a phase that
+  // has one, so the gate is always decided by the reviewer.
+  autoReview: true,
+  // G5 dev lanes of a parallel wave: "shared" (same folder, anti-collision by prompt) or
+  // "worktree" (one git worktree per lane, merged after the wave; commits the workspace).
+  devIsolation: "shared",
   // How to launch the DELIVERED product (the app the chain builds) locally.
   app: {
     backend: { command: "", cwd: "" },
@@ -31,7 +44,8 @@ const DEFAULT_CONFIG = {
   // the domain expert agent, only pausing to ask the human when the expert is itself blocked.
   autopilot: {
     enabled: false,
-    // How many agent runs may execute at once before a new planning turn is held back.
+    // Max agent processes running at once; below it the conductor keeps delegating and
+    // planning alongside the agents already at work (a dev batch counts each lane).
     maxConcurrent: 1,
     // Hard stop after this many orchestration turns (guards against loops).
     maxIterations: 30,

@@ -96,17 +96,23 @@ platform/
   producers/reviewer, inputs), deliverables, agents/skills/mcp, decisions enrichies,
   feedback, summary. **C'est l'agrégateur central côté lecture.**
 - **Contrat d'I/O agent** (human-in-the-loop) : fichiers JSON sous
-  `livrables/_governance/agent-io/` — `pending-input.json` (questions/décisions émises
-  par l'IA), `answers.json` (réponses humaines), `resolutions.json` (choix délégués
-  faits par l'IA), `feedback.json`, `uploads/`.
+  `livrables/_governance/agent-io/`, **propres à chaque run** — `pending-input-<runId>.json`
+  (questions/décisions émises par l'IA), `risks-<runId>.json`, `tasks-<runId>.json`,
+  `resolutions-<runId>.json` (choix délégués faits par l'IA), `answers-<runId>.json`
+  (réponses humaines, écrites pour la reprise de ce run seulement), plus `feedback.json`
+  et `uploads/`. Les prompts nomment les fichiers partagés par défaut : `runs.js`
+  (`isolatePromptIo`) les réécrit vers ceux du run, `run-hooks.js` les ingère.
 - **Run** : une exécution d'agent (`services/runs.js`). Lance `claude -p
   --permission-mode <config.permissionMode, défaut bypassPermissions> --output-format stream-json --verbose`, parse le flux
-  en progression lisible (SSE), capture coût/tokens depuis l'event `result`, et
-  **persiste un enregistrement** dans `spend.json` + un **log** `runs/<id>.log`.
+  en progression lisible (SSE), capture coût/tokens depuis l'event `result` (et l'usage
+  par message pendant le run), et **persiste** : une ligne dans `spend.jsonl`, le flux brut
+  `runs/<id>.jsonl`, le log lisible `runs/<id>.log`, et `runs/<id>.meta.json` (session,
+  agent, cwd, fichiers agent-io, prompt d'origine) dont se sert la reprise.
 - **Decision inbox** : `services/decisions-store.js`. Les items émis par l'IA sont
   ingérés (`inbox-ingest.js`), routés à un profil, répondus par l'humain, et une
   réponse complète débloque une **reprise** (`resume`).
-- **Coûts / Activité** : `spend.json` est le journal persistant de chaque run.
+- **Coûts / Activité** : `spend.jsonl` (une ligne par run, plus l'ancien `spend.json` lu
+  en lecture seule) est le journal persistant de chaque run.
   `spend-store.js` l'agrège (BI par phase/agent/kind/jour). `activity.js` en dérive le
   **journal d'activité** (qui a fait quoi, fichiers produits, décisions soulevées).
 
@@ -174,14 +180,20 @@ if (pathname === "/api/mon-truc" && req.method === "GET") {
 | Fichier | Rôle |
 |---|---|
 | `project-state.js` | **Agrégateur de lecture** : construit tout l'état pour `/api/state`. |
-| `runs.js` | Moteur d'exécution d'un agent (spawn claude, SSE, capture coût, persist spend + log). |
-| `group-runner.js` | Exécution **parallèle** intra-phase (Option A) : plusieurs agents d'un stage en simultané, scindés par folders. |
+| `runs.js` | Moteur d'exécution d'un agent : spawn claude (sortie vers fichier suivi en direct), SSE, coût en direct et final, modèle par `kind`, timeout, annulation par PID, reprise de session, fichiers agent-io par run, ré-adoption après redémarrage. |
+| `run-hooks.js` | Fin de run commune (live et ré-adopté) : ingestion des fichiers agent-io, clôture des tâches, résolution déléguée, reprise, revue enchaînée. |
+| `run-resume.js` | Reprise du run qui a posé les questions : même agent, même cwd, `--resume <session>` ; à défaut, prompt d'origine rejoué. |
+| `phase-runs.js` | Lancements partagés : production d'une phase, revue, remédiation (revue enchaînée si la phase a un reviewer). |
+| `group-runner.js` | Exécution **parallèle** intra-phase (Option A) : plusieurs agents d'un stage en simultané, scindés par folders ; worktree git par lane G5 en option ; arrêt du groupe ; revue enchaînée. |
+| `verification.js` | Preuves exécutables G5/G6 : lecture et validation de `07-tests/verification.json`, approbation humaine par empreinte, verrou des tests d'acceptation de `@qa`, lecture JUnit, verdict par US, fraîcheur (aucun run qui modifie le produit depuis), plafonnement du fichier de gate. Les commandes tournent via `startCommandRun` (`runs.js`). Écran : `components/EvidencePanel.jsx` (G4, G5, G6). |
+| `request-flow.js` / `request-prompts.js` | Guichet des demandes : registre `requests.json`, classement par l'orchestrateur, déroulés fixes par type (question, anomalie, évolution, changement de cadrage), file d'attente des étapes qui touchent le produit, décisions réservées au pilote, avancement en fin de run (hooks) et après une décision. Écran : `screens/RequestsScreen.jsx`. |
+| `worktrees.js` | Isolation des lanes G5 : instantané, worktree + branche par lane, fusion après la vague, conflit = branche conservée. |
 | `run-prompts.js` | Fabrique des prompts (G0, phase, tâche agent, review, chat, resume, nouveau besoin) + bloc contrat + politique librairies. |
 | `decisions-store.js` | CRUD décisions/questions : create, createItems (ingest bulk), answer, answer bulk (délégué), reopen, applyResolutions, readRunAnswers. |
-| `inbox-ingest.js` | Ingestion de `pending-input.json` / `resolutions.json` dans l'inbox routée. |
+| `inbox-ingest.js` | Ingestion d'un fichier pending-input / resolutions / risks / tasks dans l'inbox et les registres. |
 | `inputs-store.js` | Documents d'entrée **par phase** (`livrables/_inputs/<phase>/`) + statut pris/pas-pris en compte. |
 | `feedback-store.js` | Feedback sur livrables (état + miroir dans agent-io). |
-| `spend-store.js` | Append + agrégation BI des coûts/tokens (`spend.json`). Coût effectif = reporté sinon estimé via pricing. |
+| `spend-store.js` | Append (`spend.jsonl`) + agrégation BI des coûts/tokens, en cache sur la taille et la date des fichiers. Coût effectif = reporté sinon estimé via pricing. |
 | `activity.js` | Journal d'activité : timeline enrichie (desc, fichiers produits parsés du log, décisions), rollups par agent & par phase. |
 | `gates.js` | Lecture/parse des fichiers de gate. |
 | `deliverables.js` / `deliverable-content.js` | Liste des livrables / lecture d'un contenu. |
@@ -256,18 +268,21 @@ délégation/upload), `DocViewerModal`, `PhaseInputs`, `FolderInput` (chemin + �
 
 ```
 G0 / phase / review lancé  ─▶  runs.js spawn claude (stream-json)
-   agent écrit livrables + pending-input.json (questions/décisions)
+   agent écrit livrables + pending-input-<runId>.json (questions/décisions)
         │  (SSE live vers RunConsole)
         ▼
-run terminé ─▶ onDone ─▶ inbox-ingest ─▶ decisions-store (items routés au profil)
+run terminé ─▶ run-hooks ─▶ inbox-ingest ─▶ decisions-store (items routés au profil)
         ▼
-humain répond dans DecisionDetailModal ─▶ answers.json (+ ADR si besoin)
+humain répond dans DecisionDetailModal ─▶ answers/<runId>.json (+ ADR si besoin)
         │  quand un run est "fully answered"
         ▼
-bandeau « Relancer l'IA » ─▶ POST /api/runs/resume ─▶ claude reprend avec les réponses
+bandeau « Relancer l'IA » ─▶ POST /api/runs/resume ─▶ run-resume : même agent,
+        claude --resume <session>, réponses dans answers-<runId>.json
+        ▼
+producteur terminé sans question en attente ─▶ revue enchaînée (le reviewer décide le gate)
 ```
 
-Chaque run persiste : `spend.json` (coût/tokens/kind/phase/agent) et `runs/<id>.log`
+Chaque run persiste : `spend.jsonl` (coût/tokens/kind/phase/agent) et `runs/<id>.log`
 (progression) — c'est **ce que lisent les écrans Coûts et Activité**.
 
 ---
